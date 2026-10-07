@@ -17,9 +17,9 @@ class BudgetTests(unittest.TestCase):
                 except BudgetExhausted:
                     return False
             with ThreadPoolExecutor(max_workers=8) as workers:
-                self.assertEqual(sum(workers.map(attempt, range(40))), 10)
+                self.assertEqual(sum(workers.map(attempt, range(40))), 6)
             restored = ApiBudget(budget.path)
-            self.assertEqual(restored.used, 10)
+            self.assertEqual(restored.used, 6)
             self.assertEqual(restored.credit, 0)
 
     def test_credit_survives_restart_and_only_grows_during_active_use(self):
@@ -27,7 +27,7 @@ class BudgetTests(unittest.TestCase):
             path = Path(directory) / 'budget.json'
             with patch('api_budget.time.monotonic', return_value=0):
                 budget = ApiBudget(path)
-                for _ in range(10):
+                for _ in range(6):
                     budget.consume()
                 with self.assertRaises(BudgetExhausted):
                     budget.consume()
@@ -38,13 +38,24 @@ class BudgetTests(unittest.TestCase):
                 restarted.tick(True, 30)
                 for now in range(40, 3631, 10):
                     restarted.tick(True, now)
-                self.assertAlmostEqual(restarted.credit, 5)
+                self.assertAlmostEqual(restarted.credit, 2)
 
     def test_total_cap_and_corrupt_state_fail_closed(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'budget.json'
-            path.write_text('{"credit": 10, "used": 2000}')
+            path.write_text('{"credit": 10, "used": 1000}')
             self.assertFalse(ApiBudget(path).available())
+
+    def test_lowering_existing_budget_preserves_usage_and_clamps_credit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'budget.json'
+            path.write_text('{"credit": 10, "used": 999, "total_limit": 2000}')
+            budget = ApiBudget(path)
+            self.assertEqual(budget.credit, 6)
+            self.assertEqual(budget.used, 999)
+            budget.consume()
+            self.assertFalse(budget.available())
+            self.assertEqual(ApiBudget(path).used, 1000)
             path.write_text('not valid JSON')
             self.assertFalse(ApiBudget(path).available())
 

@@ -20,7 +20,7 @@ from api_budget import BudgetExhausted
 from feature_badge import feature_badge
 
 ROOT = Path(__file__).resolve().parent
-SNAPSHOT_REFRESH_SECONDS = 3600
+SNAPSHOT_REFRESH_SECONDS = 7200
 RENDER_SIZE = 600
 RENDER_MARGIN = 16
 

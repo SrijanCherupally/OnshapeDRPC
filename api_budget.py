@@ -19,9 +19,9 @@ class BudgetExhausted(RuntimeError):
 
 
 class ApiBudget:
-    RATE_PER_HOUR = 5
-    TOTAL_LIMIT = 2000
-    STARTING_CREDIT = 10
+    RATE_PER_HOUR = 2
+    TOTAL_LIMIT = 1000
+    STARTING_CREDIT = 6
 
     def __init__(self, path):
         self.lock = threading.RLock()
