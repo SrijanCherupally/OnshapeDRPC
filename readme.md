@@ -16,7 +16,7 @@ Document: Robot Design
 - Reads the selected Onshape page URL through Windows accessibility, including installed Onshape browser apps. Duplicate tab names and non-default workspaces are resolved using their IDs.
 - Uses the Onshape logo and provides a **View in Onshape** button; document access is enforced by Onshape.
 - Always blurs Biobuzz; other documents show clear previews by default. Add more protected documents by name or ID.
-- Checks for tab changes every 2 seconds and refreshes previews every 30 seconds.
+- Checks for tab changes every 2 seconds and refreshes previews about every 30 minutes when budget allows.
 - Runs silently, starts at Windows login, reconnects when Discord becomes available, and prevents duplicate instances.
 - Keeps rotating local diagnostic logs instead of requiring a console window.
 
@@ -92,7 +92,7 @@ A local server on 127.0.0.1:19288 serves the processed preview at an unpredictab
 
 **Every shared preview, clear or blurred, is accessible to anyone with its URL and is processed by Cloudflare and Discord. Blurring is a visual treatment, not an access-control guarantee.** Document and tab names are also visible to anyone who can view your Discord activity. People may still recognize the model's silhouette. Existing unblurred images from earlier revisions may remain in Discord caches; the app cannot revoke cached copies.
 
-Snapshots are isometric API renders or fallback thumbnails rather than captures of your exact viewport. They change when you switch elements and are checked every 30 seconds. Some element types have no suitable thumbnail. The logo is used if a thumbnail or tunnel is unavailable. Old paths are removed when the current preview changes or no visible Onshape window is found.
+Snapshots are isometric API renders or fallback thumbnails rather than captures of your exact viewport. They change when you switch elements and are checked about every 30 minutes when budget allows. Some element types have no suitable thumbnail. The logo is used if a thumbnail or tunnel is unavailable. Old paths are removed when the current preview changes or no visible Onshape window is found.
 
 Quick Tunnels need no Cloudflare account, but are intended for testing and development and have no uptime guarantee. Their hostname changes at app restart; the presence updates automatically. The helper launches silently at login and retries after exiting. This integration remains experimental.
 
@@ -133,26 +133,30 @@ For visible debugging:
 
 Do not run this alongside an existing background instance. `presence.log` rotates at 500 KB with two backups. Logs are ignored by Git.
 
-## Update Speed and Resource Use
+## Low-Usage Mode: 400 Hours per Year
 
-Tab titles are checked every 2 seconds. Changing the window or title triggers a new URL read immediately; unchanged windows reuse their URL for 6 seconds. This also refreshes same-name tabs. Metadata stays cached for 60 seconds. Previews refresh every 30 seconds, and switching tabs triggers a new preview immediately.
+The app checks local browser tabs every 2 seconds and reads an unchanged window URL every 6 seconds. These local checks do not use the Onshape API. Discord submissions remain at least 15 seconds apart, and rendering/delivery adds latency.
 
-Discord receives only changed content, with at least 15 seconds between submissions. A rapid second tab switch can wait for that submission window. Rendering and Discord delivery add latency, so a 2-second check does not guarantee a 2-second visible update.
+The app targets five API calls per active hour. API credit accrues only while the app observes a visible Onshape document window. Ten initial calls allow first-time setup, and no more than ten unused credits can be held. Every outgoing API request, including failed attempts and fallback thumbnail requests, consumes credit. A persistent hard cap stops requests after 2,000 attempts. Restarting the app does not reset credit or the cap, and resuming Windows from sleep does not award a large burst of credit.
 
-On the development PC with 16 logical processors, reading the browser URL used approximately 0.35 CPU-seconds. Refreshing it every 6 seconds is estimated to add about 0.2–0.3 percentage points of total CPU use compared with the old 15-second lookup. Cached title checks averaged 0.17 milliseconds in a short benchmark. This estimates polling overhead rather than total application use.
+This targets roughly 2,000 calls across 400 active hours, instead of hundreds of calls per hour. The hard cap also limits bursts or unusual tab-switching patterns. For [Free, EDU Student, and Standard accounts, Onshape currently lists 2,500 calls annually](https://onshape-public.github.io/docs/auth/limits/), leaving approximately 500 for other integrations **if at least 2,500 calls remain at setup**. Calls consumed before this change are still part of your current allowance; the app cannot refund them or read the account's remaining quota from its local counter.
 
-For a single visible Assembly or Part Studio, the nominal request budget is roughly 360 Onshape calls per hour: two metadata calls per minute plus two render calls every 30 seconds. The old 90-second preview schedule used about 200 calls per hour. Network delays reduce these counts; switching documents and render fallbacks can add calls. No document window means no periodic renders.
+Metadata is cached for a day and saved in metadata-cache.json. Processed previews are saved under preview-cache/ and normally refreshed every 30 minutes. Returning to a saved tab or restarting reuses its preview without additional requests. Biobuzz remains blurred, including saved previews.
 
-[Onshape calls count toward plan-dependent annual limits](https://onshape-public.github.io/docs/auth/limits/). API quota is the main tradeoff. The intervals are defined by POLL_SECONDS and URL_REFRESH_SECONDS in main.py and SNAPSHOT_REFRESH_SECONDS in snapshot_bridge.py.
+When credit is exhausted, known tab types and old images remain available. A newly visited tab can show a generic Tab label or the Onshape logo until credit is available. Browser document/tab names and exact links still come from the local window URL. Invalid budget state disables API requests rather than refilling credit.
+
+The budget is tracked in api-budget.json, excluded from Git along with the metadata and previews. Its used counter counts this app's attempts from the time low-usage mode was installed; it is not your Onshape account usage counter. The 2,000-call cap does not reset automatically because Onshape's allowance cycle may differ from the calendar year. Once your account allowance renews, stop the app, archive api-budget.json, and restart to start a new app budget. Do not reset it during the current allowance period.
+
+Local CPU stays low. Reading a URL used approximately 0.35 CPU-seconds on the development PC; cached title checks averaged 0.17 milliseconds. Render requests and network transfers are now much less frequent.
 
 ## Development
 
 ```powershell
 .\venv\Scripts\python.exe -m unittest discover -s tests -v
-.\venv\Scripts\python.exe -m py_compile main.py snapshot_bridge.py
+.\venv\Scripts\python.exe -m py_compile main.py snapshot_bridge.py api_budget.py
 ```
 
-The local instance guard uses port 19287; the image server uses port 19288. snapshot-status.json contains the current preview URL and blur state and is ignored by Git. API calls have timeouts and metadata is cached for 60 seconds.
+The local instance guard uses port 19287; the image server uses port 19288. snapshot-status.json contains the current preview URL and blur state and is ignored by Git. API calls have timeouts; metadata and processed previews are saved locally across restarts.
 
 ## Credits
 

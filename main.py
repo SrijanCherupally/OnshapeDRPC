@@ -2,6 +2,7 @@
 import ctypes
 from ctypes import wintypes
 import logging
+import json
 from logging.handlers import RotatingFileHandler
 import os
 from pathlib import Path
@@ -13,6 +14,7 @@ import requests
 from dotenv import load_dotenv
 from pypresence import Presence
 from snapshot_bridge import SnapshotBridge
+from api_budget import ApiBudget, BudgetExhausted
 
 ROOT = Path(__file__).resolve().parent
 load_dotenv(ROOT / '.env')
@@ -106,18 +108,42 @@ class Onshape:
         self.session = requests.Session()
         self.session.headers.update({'Authorization': f'Basic {key}', 'Accept': 'application/json'})
         self.cache = {}
+        self.budget = ApiBudget(ROOT / 'api-budget.json')
+        self.cache_path = ROOT / 'metadata-cache.json'
+        try:
+            self.disk_cache = json.loads(self.cache_path.read_text()) if self.cache_path.exists() else {}
+        except (OSError, ValueError):
+            self.disk_cache = {}
+
+    def request(self, path, params=None, headers=None):
+        self.budget.consume()
+        return self.session.get(BASE_URL + path, params=params, headers=headers, timeout=15)
 
     def get(self, path, params=None):
-        response = self.session.get(BASE_URL + path, params=params, timeout=15)
+        response = self.request(path, params=params)
         response.raise_for_status()
         return response.json()
 
-    def cached(self, key, fetch, seconds=60):
+    def cached(self, key, fetch, seconds=86400):
         previous = self.cache.get(key)
         if previous and time.monotonic() - previous[0] < seconds:
             return previous[1]
-        value = fetch()
+        encoded = json.dumps(key)
+        disk = getattr(self, 'disk_cache', {}).get(encoded)
+        if disk and time.time() - disk[0] < seconds:
+            return disk[1]
+        try:
+            value = fetch()
+        except BudgetExhausted:
+            if previous:
+                return previous[1]
+            if disk:
+                return disk[1]
+            raise
         self.cache[key] = (time.monotonic(), value)
+        if hasattr(self, 'disk_cache'):
+            self.disk_cache[encoded] = (time.time(), value)
+            self.cache_path.write_text(json.dumps(self.disk_cache), encoding='utf-8')
         return value
 
     def documents(self, name):
@@ -134,10 +160,19 @@ class Onshape:
     def resolve(self, tab):
         if len(tab) == 3:
             did, wvm, wid, eid = tab[2]
-            document = dict(self.cached(('document', did), lambda: self.get(f'/documents/{did}')))
+            try:
+                document = dict(self.cached(('document', did), lambda: self.get(f'/documents/{did}')))
+            except BudgetExhausted:
+                document = {'id': did, 'name': tab[0]}
+            document['name'] = tab[0]
             document['_wvm'] = wvm
-            elements = self.cached(('elements', did, wvm, wid), lambda: self.get(f'/documents/d/{did}/{wvm}/{wid}/elements'))
+            try:
+                elements = self.cached(('elements', did, wvm, wid), lambda: self.get(f'/documents/d/{did}/{wvm}/{wid}/elements'))
+            except BudgetExhausted:
+                elements = []
             element = next((e for e in elements if e.get('id') == eid), None)
+            element = dict(element) if element else {'id': eid, 'elementType': 'UNKNOWN'}
+            element['name'] = tab[1]
             return document, wid, element
         documents = self.cached(('documents', tab[0]), lambda: self.documents(tab[0]))
         matches = [d for d in documents if d.get('name') == tab[0]]
@@ -182,6 +217,8 @@ def run():
     last_sent = 0
     while True:
         try:
+            tab = open_onshape_tab()
+            api.budget.tick(bool(tab))
             if rpc is None:
                 candidate = Presence(CLIENT_ID)
                 try:
@@ -196,7 +233,6 @@ def run():
                 last_payload = None
                 last_sent = 0
                 log.info('Connected to Discord.')
-            tab = open_onshape_tab()
             resolved = api.resolve(tab) if tab else None
             if not resolved:
                 bridge.clear()
@@ -223,6 +259,10 @@ def run():
                 last_sent = time.monotonic()
         except requests.RequestException as error:
             log.warning('Onshape request failed: %s', type(error).__name__)
+            time.sleep(15)
+            continue
+        except BudgetExhausted:
+            log.info('API budget exhausted; retaining cached presence.')
             time.sleep(15)
             continue
         except Exception as error:

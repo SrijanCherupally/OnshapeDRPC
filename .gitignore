@@ -7,4 +7,8 @@ main.py.bak
 tools/cloudflared.exe
 snapshot-status.json
 snapshot-settings.local.json
+api-budget.json
+api-budget.tmp
+metadata-cache.json
+preview-cache/
 __pycache__/

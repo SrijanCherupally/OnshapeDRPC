@@ -64,6 +64,7 @@ class PresenceTests(unittest.TestCase):
         api.get.side_effect = ValueError('Rendering unavailable')
         api.session.get.return_value.ok = True
         api.session.get.return_value.content = raw
+        api.request.return_value = api.session.get.return_value
         bridge = SnapshotBridge(port=0)
         bridge.ensure_tunnel = Mock()
         base = 'http://127.0.0.1:' + str(bridge.server.server_port)
@@ -87,6 +88,7 @@ class PresenceTests(unittest.TestCase):
         api = Mock()
         api.session.get.return_value.ok = True
         api.session.get.return_value.content = b'\x89PNG\r\n\x1a\ninvalid image'
+        api.request.return_value = api.session.get.return_value
         bridge = SnapshotBridge(port=0)
         bridge.ensure_tunnel = Mock()
         try:
@@ -171,6 +173,34 @@ class PresenceTests(unittest.TestCase):
                 self.assertEqual(run.call_count, 1)
         finally:
             main._tab_cache = None
+
+    def test_saved_preview_survives_restart_without_api_calls(self):
+        source = Image.new('RGB', (300, 300), 'red')
+        raw = BytesIO()
+        source.save(raw, 'PNG')
+        document = {'id': 'doc', 'name': 'Biobuzz'}
+        element = {'id': 'tab', 'name': 'Intake', 'elementType': 'ASSEMBLY'}
+        api = Mock()
+        api.budget.available.return_value = True
+        with tempfile.TemporaryDirectory() as directory, patch('snapshot_bridge.ROOT', Path(directory)), patch('snapshot_bridge.fetch_snapshot', return_value=raw.getvalue()) as fetch:
+            first = SnapshotBridge(port=0)
+            first.ensure_tunnel = Mock()
+            first.hostname = 'http://127.0.0.1:' + str(first.server.server_port)
+            try:
+                first.publish(api, document, 'ws', element)
+                self.assertEqual(fetch.call_count, 1)
+            finally:
+                first.close()
+            second = SnapshotBridge(port=0)
+            second.ensure_tunnel = Mock()
+            second.hostname = 'http://127.0.0.1:' + str(second.server.server_port)
+            api.budget.available.return_value = False
+            try:
+                url = second.publish(api, document, 'ws', element)
+                self.assertEqual(requests.get(url, timeout=3).status_code, 200)
+                self.assertEqual(fetch.call_count, 1)
+            finally:
+                second.close()
 
 
 if __name__ == '__main__':

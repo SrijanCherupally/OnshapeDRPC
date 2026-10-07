@@ -15,9 +15,10 @@ import threading
 import time
 import requests
 from PIL import Image, ImageFilter, ImageOps
+from api_budget import BudgetExhausted
 
 ROOT = Path(__file__).resolve().parent
-SNAPSHOT_REFRESH_SECONDS = 30
+SNAPSHOT_REFRESH_SECONDS = 1800
 
 
 def should_blur(document):
@@ -77,8 +78,8 @@ def fetch_snapshot(api, document, context, element):
         except (requests.RequestException, KeyError, IndexError, TypeError, ValueError, binascii.Error):
             pass
     # Other tab types, or unavailable render APIs, use the wider thumbnail.
-    response = api.session.get(
-        f'https://cad.onshape.com/api/thumbnails/d/{did}/{wvm}/{context}/e/{eid}/s/600x340',
+    response = api.request(
+        f'/thumbnails/d/{did}/{wvm}/{context}/e/{eid}/s/600x340',
         headers={'Accept': 'image/png'}, timeout=15)
     return response.content if response.ok else b''
 
@@ -171,7 +172,6 @@ class SnapshotBridge:
     def clear(self):
         with self.lock:
             self.images.clear()
-        self.last_fetch.clear()
         self.last_status = None
         (ROOT / 'snapshot-status.json').unlink(missing_ok=True)
 
@@ -182,11 +182,29 @@ class SnapshotBridge:
         self.ensure_tunnel()
         blurred = should_blur(document)
         key = (document['id'], document.get('_wvm', 'w'), context, element['id'], blurred)
+        cache_file = ROOT / 'preview-cache' / (hashlib.sha256(json.dumps(key).encode()).hexdigest() + '.png')
         old = self.last_fetch.get(key)
-        if old and time.monotonic() - old[0] < SNAPSHOT_REFRESH_SECONDS:
+        if (not old or old[1] not in self.images) and cache_file.exists():
+            saved = cache_file.read_bytes()
+            if saved.startswith(b'\x89PNG\r\n\x1a\n') and len(saved) <= 2 * 1024 * 1024:
+                path = f'/{self.token}/{hashlib.sha256(saved).hexdigest()[:24]}.png'
+                age = max(0, time.time() - cache_file.stat().st_mtime)
+                old = (time.monotonic() - age, path)
+                self.last_fetch[key] = old
+                with self.lock:
+                    self.images = {path: saved}
+        can_refresh = not hasattr(api, 'budget') or api.budget.available(3)
+        if old and (time.monotonic() - old[0] < SNAPSHOT_REFRESH_SECONDS or not can_refresh):
             path = old[1]
         else:
-            raw = fetch_snapshot(api, document, context, element)
+            if not can_refresh:
+                with self.lock:
+                    self.images.clear()
+                return 'onshape_logo'
+            try:
+                raw = fetch_snapshot(api, document, context, element)
+            except BudgetExhausted:
+                return self.hostname + old[1] if old and self.hostname else 'onshape_logo'
             if not raw.startswith(b'\x89PNG\r\n\x1a\n'):
                 self.clear()
                 return 'onshape_logo'
@@ -202,7 +220,9 @@ class SnapshotBridge:
             with self.lock:
                 # Store only the processed image permitted by this document's rules.
                 self.images = {path: data}
-            self.last_fetch = {key: (time.monotonic(), path)}
+            cache_file.parent.mkdir(exist_ok=True)
+            cache_file.write_bytes(data)
+            self.last_fetch[key] = (time.monotonic(), path)
         if not self.hostname:
             return 'onshape_logo'
         url = self.hostname + path
