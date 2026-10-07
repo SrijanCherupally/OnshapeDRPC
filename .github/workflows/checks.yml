@@ -14,5 +14,5 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install -r requirements.txt
-      - run: python -m py_compile main.py active_url.py snapshot_bridge.py api_budget.py
+      - run: python -m py_compile main.py active_url.py feature_activity.py feature_badge.py snapshot_bridge.py api_budget.py
       - run: python -m unittest discover -s tests -v

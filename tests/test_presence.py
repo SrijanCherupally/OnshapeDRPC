@@ -72,7 +72,7 @@ class PresenceTests(unittest.TestCase):
         bridge.hostname = base
         try:
             with tempfile.TemporaryDirectory() as directory, patch('snapshot_bridge.ROOT', Path(directory)):
-                url = bridge.publish(api, {'id': 'doc'}, 'ws', {'id': 'tab', 'name': 'Intake', 'elementType': 'PARTSTUDIO'})
+                url = bridge.publish(api, {'id': 'doc'}, 'ws', {'id': 'tab', 'name': 'Intake', 'elementType': 'ASSEMBLY'})
                 served = requests.get(url, timeout=3)
                 self.assertEqual(served.content, blur_snapshot(raw))
                 self.assertNotEqual(served.content, raw)
@@ -94,7 +94,7 @@ class PresenceTests(unittest.TestCase):
         bridge.ensure_tunnel = Mock()
         try:
             with tempfile.TemporaryDirectory() as directory, patch('snapshot_bridge.ROOT', Path(directory)):
-                result = bridge.publish(api, {'id': 'doc'}, 'ws', {'id': 'tab'})
+                result = bridge.publish(api, {'id': 'doc'}, 'ws', {'id': 'tab', 'name': 'Intake', 'elementType': 'ASSEMBLY'})
             self.assertEqual(result, 'onshape_logo')
             self.assertEqual(bridge.images, {})
         finally:
@@ -146,7 +146,7 @@ class PresenceTests(unittest.TestCase):
         bridge.hostname = 'http://127.0.0.1:' + str(bridge.server.server_port)
         api = Mock()
         document = {'id': 'doc', 'name': 'Other Robot'}
-        element = {'id': 'tab', 'name': 'Intake', 'elementType': 'PARTSTUDIO'}
+        element = {'id': 'tab', 'name': 'Intake', 'elementType': 'ASSEMBLY'}
         try:
             with tempfile.TemporaryDirectory() as directory, patch('snapshot_bridge.ROOT', Path(directory)), patch('snapshot_bridge.fetch_snapshot', return_value=raw.getvalue()):
                 clear_url = bridge.publish(api, document, 'ws', element)
@@ -189,7 +189,7 @@ class PresenceTests(unittest.TestCase):
         api = Mock()
         doc = {'id': 'doc', 'name': 'Robot'}
         first = {'id': 'first', 'name': 'First', 'elementType': 'ASSEMBLY'}
-        second = {'id': 'second', 'name': 'Second', 'elementType': 'PARTSTUDIO'}
+        second = {'id': 'second', 'name': 'Second', 'elementType': 'ASSEMBLY'}
         try:
             with tempfile.TemporaryDirectory() as directory, patch('snapshot_bridge.ROOT', Path(directory)), patch('snapshot_bridge.fetch_snapshot', side_effect=fetch) as mocked:
                 self.assertEqual(bridge.publish(api, doc, 'ws', first, blocking=False), 'onshape_logo')

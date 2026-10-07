@@ -16,6 +16,7 @@ from pypresence import Presence
 from snapshot_bridge import SnapshotBridge
 from api_budget import ApiBudget, BudgetExhausted
 from active_url import UrlReader
+from feature_activity import feature_activity
 
 ROOT = Path(__file__).resolve().parent
 load_dotenv(ROOT / '.env')
@@ -26,6 +27,7 @@ URL_REFRESH_SECONDS = 1
 PRESENCE_MIN_SECONDS = 5
 _tab_cache = None
 _url_reader = None
+_browser_state = {}
 LABELS = {'PARTSTUDIO': 'Part Studio', 'ASSEMBLY': 'Assembly', 'DRAWING': 'Drawing',
           'VARIABLESTUDIO': 'Variable Studio', 'BILLOFMATERIALS': 'Bill of Materials', 'BLOB': 'Imported File'}
 log = logging.getLogger('onshape_presence')
@@ -38,10 +40,11 @@ def parse_title(title):
 
 
 def read_onshape_url(title):
-    global _url_reader
+    global _url_reader, _browser_state
     if _url_reader is None:
         _url_reader = UrlReader()
-    return _url_reader.read(title)
+    _browser_state = _url_reader.read_state(title)
+    return _browser_state.get('url', '')
 
 
 def cached_tab(hwnd, title, tab):
@@ -192,12 +195,20 @@ class Onshape:
         element = matches[0] if len(matches) == 1 else None
         return document, wid, element
 
-def make_presence(document, element, tab_name, start, context=None):
+def make_presence(document, element, tab_name, start, context=None, activity=None):
     kind = LABELS.get(element.get('elementType'), 'Tab') if element else 'Tab'
     details = f'{kind}: {tab_name}'
     payload = dict(name='Onshape', details=details[:128], state=f"Document: {document['name']}"[:128],
                    start=start, large_image='onshape_logo', large_text=details[:128],
                    small_image='onshape_logo', small_text='Onshape')
+    if element and element.get('elementType') == 'PARTSTUDIO':
+        activity = activity or {'label': 'Unavailable', 'name': ''}
+        label = activity['label']
+        text = 'Feature Detection Unavailable' if label == 'Unavailable' else label
+        if activity.get('name') and activity['name'] != label:
+            text += ': ' + activity['name']
+        payload['state'] = f"{text} | Document: {document['name']}"[:128]
+        payload['large_text'] = text[:128]
     if context and element:
         url = f"https://cad.onshape.com/documents/{document['id']}/{document.get('_wvm', 'w')}/{context}/e/{element['id']}"
         payload['buttons'] = [{'label': 'View in Onshape', 'url': url}]
@@ -247,18 +258,26 @@ def run():
                 time.sleep(POLL_SECONDS)
                 continue
             document, wid, element = resolved
+            # Local feature-list detection also identifies uncached Part Studios.
+            if element and element.get('elementType') == 'UNKNOWN' and _browser_state.get('part_studio'):
+                element['elementType'] = 'PARTSTUDIO'
             identity = (document['id'], wid, element['id'] if element else tab[1])
             if identity != current:
                 started = int(time.time())
                 current = identity
-            payload = make_presence(document, element, element['name'] if element else tab[1], started, wid)
-            payload['large_image'] = bridge.publish(api, document, wid, element, blocking=False)
+            activity = feature_activity(_browser_state)
+            payload = make_presence(document, element, element['name'] if element else tab[1], started, wid, activity)
+            if element and element.get('elementType') == 'PARTSTUDIO':
+                payload['large_image'] = bridge.publish_feature(document, element, activity)
+            else:
+                payload['large_image'] = bridge.publish(api, document, wid, element, blocking=False)
             if payload != last_payload and time.monotonic() - last_sent >= PRESENCE_MIN_SECONDS:
                 reply = rpc.update(**payload)
                 accepted = reply.get('data') or {}
-                log.info('Presence accepted: name=%s, %s / %s, snapshot=%s',
+                image_kind = ('feature' if element and element.get('elementType') == 'PARTSTUDIO' else 'snapshot') if payload['large_image'].startswith('https://') else 'logo'
+                log.info('Presence accepted: name=%s, %s / %s, image=%s',
                          accepted.get('name', payload['name']), payload['details'], payload['state'],
-                         payload['large_image'].startswith('https://'))
+                         image_kind)
                 last_payload = payload
                 last_sent = time.monotonic()
         except requests.RequestException as error:

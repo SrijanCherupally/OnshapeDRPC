@@ -13,7 +13,7 @@ class UrlReader:
         self.responses = queue.Queue()
         atexit.register(self.close)
 
-    def read(self, title):
+    def read(self, title, state=False):
         try:
             if self.process is None or self.process.poll() is not None:
                 self.responses = queue.Queue()
@@ -27,12 +27,19 @@ class UrlReader:
                     for line in process.stdout:
                         responses.put(line.strip())
                 threading.Thread(target=collect, daemon=True).start()
-            self.process.stdin.write(json.dumps({'title': title}) + '\n')
+            self.process.stdin.write(json.dumps({'title': title, 'state': state}) + '\n')
             self.process.stdin.flush()
             return self.responses.get(timeout=8)
         except (OSError, ValueError, queue.Empty):
             self.close()
             return ''
+
+    def read_state(self, title):
+        try:
+            value = json.loads(self.read(title, state=True))
+            return value if isinstance(value, dict) else {}
+        except (ValueError, TypeError):
+            return {}
 
     def close(self):
         if self.process and self.process.poll() is None:

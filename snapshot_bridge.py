@@ -17,6 +17,7 @@ from concurrent.futures import ThreadPoolExecutor
 import requests
 from PIL import Image, ImageFilter, ImageOps
 from api_budget import BudgetExhausted
+from feature_badge import feature_badge
 
 ROOT = Path(__file__).resolve().parent
 SNAPSHOT_REFRESH_SECONDS = 3600
@@ -199,7 +200,7 @@ class SnapshotBridge:
             return None
 
     def publish(self, api, document, context, element, blocking=True):
-        if not element:
+        if not element or element.get('elementType') != 'ASSEMBLY':
             self.clear()
             return 'onshape_logo'
         self.ensure_tunnel()
@@ -277,13 +278,22 @@ class SnapshotBridge:
             self.last_fetch[key] = (time.monotonic(), path)
         return self.status_url(document, element, blurred, path)
 
-    def status_url(self, document, element, blurred, path):
+    def publish_feature(self, document, element, activity):
+        self.ensure_tunnel()
+        data = feature_badge(activity['label'])
+        path = f'/{self.token}/feature-{hashlib.sha256(data).hexdigest()[:24]}.png'
+        with self.lock:
+            self.images = {path: data}
+        return self.status_url(document, element, False, path, activity=activity)
+
+    def status_url(self, document, element, blurred, path, activity=None):
         if not self.hostname:
             return 'onshape_logo'
         url = self.hostname + path
         status = json.dumps({
             'tab': element['name'], 'type': element['elementType'], 'image_url': url,
-            'blurred': blurred, 'document': document.get('name', '')
+            'blurred': blurred, 'document': document.get('name', ''),
+            'feature': activity, 'model_snapshot': activity is None
         })
         if status != self.last_status:
             (ROOT / 'snapshot-status.json').write_text(status, encoding='utf-8')

@@ -5,8 +5,8 @@ Discord Rich Presence for Onshape on Windows, with per-document blur settings an
 ```text
 Onshape
 Part Studio: Intake
-Document: Robot Design
-[Blurred model silhouette with a small Onshape badge]
+Sketch: Sketch 1 | Document: Robot Design
+[Sketch feature badge with a small Onshape badge]
 ```
 
 ## Features
@@ -15,7 +15,8 @@ Document: Robot Design
 - Identifies **Part Studio**, **Assembly**, **Drawing**, **Variable Studio**, **Bill of Materials**, and imported files.
 - Reads the selected Onshape page URL through Windows accessibility, including installed Onshape browser apps. Duplicate tab names and non-default workspaces are resolved using their IDs.
 - Uses the Onshape logo and provides a **View in Onshape** button; document access is enforced by Onshape.
-- Always blurs Biobuzz; other documents show clear previews by default. Add more protected documents by name or ID.
+- Part Studios show the open feature editor (Sketch, Extrude, Fillet, and other tools), or **Idle** when no feature is being edited. Feature badges replace model previews and require no Onshape API calls.
+- Assemblies show model snapshots. Always blurs Biobuzz; other documents show clear Assembly previews by default. Add more protected documents by name or ID.
 - Checks for tab changes every half-second, submits changed activity at least 5 seconds apart, and refreshes each preview about once an hour when budget allows.
 - Runs silently, starts at Windows login, reconnects when Discord becomes available, and prevents duplicate instances.
 - Keeps rotating local diagnostic logs instead of requiring a console window.
@@ -82,7 +83,7 @@ To disable automatic startup, open `shell:startup` using Win + R and delete `Ons
 
 Discord cannot enforce Onshape document permissions for Rich Presence images. This app displays previews publicly, using blur rules for protected documents, while the **View in Onshape** button opens the full model with Onshape's normal sign-in and document access checks.
 
-For Assemblies and Part Studios, the app reads the model bounding box and requests a fresh 600 x 600 isometric shaded render. The camera is centered on the model and its scale is chosen to include every projected bounding-box corner, preventing the clipping present in some cached Onshape thumbnails. Other tab types, or unavailable render APIs, use a 300 x 170 generated thumbnail as a fallback.
+For Assemblies, the app reads the model bounding box and requests a fresh 600 x 600 isometric shaded render. The camera is centered on the model and its scale is chosen to include every projected bounding-box corner, preventing the clipping present in some cached Onshape thumbnails. If the Assembly render API is unavailable, the app uses a 300 x 170 generated Assembly thumbnail as a fallback. Part Studios never request or display model previews. Drawing and other tab types use the Onshape logo.
 
 Pillow removes unused transparent background and fits all visible geometry proportionally into the square Discord preview, with a small border to keep the blurred edges inside the image. Only empty background is cropped. Clear previews retain a 600 x 600 canvas with the same proportional fit and border. The blur stays at 64 x 64 detail reduction and an 8-pixel Gaussian blur on a 300 x 300 canvas. This obscures small details while retaining the general shape. Original image metadata is discarded.
 
@@ -92,7 +93,7 @@ A local server on 127.0.0.1:19288 serves the processed preview at an unpredictab
 
 **Every shared preview, clear or blurred, is accessible to anyone with its URL and is processed by Cloudflare and Discord. Blurring is a visual treatment, not an access-control guarantee.** Document and tab names are also visible to anyone who can view your Discord activity. People may still recognize the model's silhouette. Existing unblurred images from earlier revisions may remain in Discord caches; the app cannot revoke cached copies.
 
-Snapshots are isometric API renders or fallback thumbnails rather than captures of your exact viewport. They change when you switch elements and are checked about every 60 minutes when budget allows. Some element types have no suitable thumbnail. The logo is used if a thumbnail or tunnel is unavailable. Old paths are removed when the current preview changes or no visible Onshape window is found.
+Assembly snapshots are isometric API renders or fallback thumbnails rather than captures of your exact viewport. They change when you switch elements and are checked about every 60 minutes when budget allows. Some element types have no suitable thumbnail. The logo is used if a thumbnail or tunnel is unavailable. Old paths are removed when the current preview changes or no visible Onshape window is found.
 
 Quick Tunnels need no Cloudflare account, but are intended for testing and development and have no uptime guarantee. Their hostname changes at app restart; the presence updates automatically. The helper launches silently at login and retries after exiting. This integration remains experimental.
 
@@ -112,6 +113,14 @@ Edit `snapshot-settings.json` to add protected names or IDs:
 Use `snapshot-settings.local.json` with the same fields for personal rules that should not be committed to Git. Local rules add to the shared rules; they cannot remove protections. New installations can add the Biobuzz document ID from its Onshape URL to protect it after renaming. The built-in Biobuzz name rule cannot be accidentally disabled by deleting the example settings entry.
 
 Other documents show clear previews. Settings are re-read on each presence update, normally within half a second. Changing a rule removes the old image path immediately. The new permitted preview is loaded from cache or rendered in the background; the logo is used while a new preview is unavailable. Invalid settings make all previews blurred until fixed. Previously cached Discord images cannot be revoked.
+
+## Part Studio Feature Activity
+
+The persistent local accessibility helper reads only the open `feature-dialog` panel. Its help topic identifies built-in feature types, including renamed Sketches and Extrudes; the editor title supplies the feature name. Unrecognized custom features show `Feature: <editor name>`. Toolbar tools and saved feature-list entries are never treated as active editing.
+
+When no feature editor is open in a detected Part Studio, the status is **Idle**. Here, Idle means no feature is being edited; it does not measure keyboard/mouse inactivity. If the browser does not expose enough accessibility information, the app reports **Feature Detection Unavailable**, rather than falsely claiming Idle. Feature activity is read about once a second and uses the existing 5-second minimum between changed Discord submissions.
+
+Part Studios show a locally generated feature badge instead of a CAD snapshot. Only the feature type is drawn in the badge; the editor name appears in the activity text and image hover text. Badges use the same tunnel as Assembly previews and require no Onshape API requests. Feature names are visible to people who can see your Discord activity. Assemblies keep their fitted previews and existing blur rules.
 
 ## Troubleshooting
 
@@ -147,7 +156,7 @@ When credit is exhausted, known tab types and old images remain available. A new
 
 The budget is tracked in api-budget.json, excluded from Git along with the metadata and previews. Its used counter counts this app's attempts from the time low-usage mode was installed; it is not your Onshape account usage counter. The 2,000-call cap does not reset automatically because Onshape's allowance cycle may differ from the calendar year. Once your account allowance renews, stop the app, archive api-budget.json, and restart to start a new app budget. Do not reset it during the current allowance period.
 
-Renders use 600 x 600 source pixels, and clear previews retain that resolution. Biobuzz keeps the existing blur strength and 300 x 300 processed canvas. Resolution changes affect rendering work and transferred bytes, not API call counts. Each successful Assembly or Part Studio refresh normally uses two calls (bounds plus render). Hourly refreshes therefore use roughly 800 calls over 400 hours of a single continuously viewed tab, plus metadata and any fallback requests. First visits to additional tabs can need previews sooner; the five-call hourly credit rate and 2,000-call hard cap still apply.
+Renders use 600 x 600 source pixels, and clear previews retain that resolution. Biobuzz keeps the existing blur strength and 300 x 300 processed canvas. Resolution changes affect rendering work and transferred bytes, not API call counts. Part Studio feature detection uses zero Onshape requests, and Part Studio preview requests are disabled. Each successful Assembly refresh normally uses two calls (bounds plus render). Hourly refreshes therefore use roughly 800 calls over 400 hours of a single continuously viewed tab, plus metadata and any fallback requests. First visits to additional tabs can need previews sooner; the five-call hourly credit rate and 2,000-call hard cap still apply.
 
 On the development PC, the first local URL read took about 0.38 seconds, and subsequent reads with the persistent helper took about 0.02–0.04 seconds. Timing depends on browser accessibility and document size.
 
@@ -155,7 +164,7 @@ On the development PC, the first local URL read took about 0.38 seconds, and sub
 
 ```powershell
 .\venv\Scripts\python.exe -m unittest discover -s tests -v
-.\venv\Scripts\python.exe -m py_compile main.py active_url.py snapshot_bridge.py api_budget.py
+.\venv\Scripts\python.exe -m py_compile main.py active_url.py feature_activity.py feature_badge.py snapshot_bridge.py api_budget.py
 ```
 
 The local instance guard uses port 19287; the image server uses port 19288. snapshot-status.json contains the current preview URL and blur state and is ignored by Git. API calls have timeouts; metadata and processed previews are saved locally across restarts.
