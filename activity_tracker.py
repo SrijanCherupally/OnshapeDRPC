@@ -6,6 +6,28 @@ import time
 IDLE_SECONDS = 15 * 60
 
 
+class SessionTimer:
+    """Time the open Onshape session, allowing brief tab-loading gaps."""
+    def __init__(self):
+        self.started = None
+        self.missing_since = None
+
+    def update(self, visible, now=None):
+        now = time.time() if now is None else now
+        if visible:
+            if self.missing_since is not None and now - self.missing_since >= 30:
+                self.started = None
+            if self.started is None:
+                self.started = int(now)
+            self.missing_since = None
+        elif self.started is not None:
+            if self.missing_since is None:
+                self.missing_since = now
+            if now - self.missing_since >= 30:
+                self.started = None
+        return self.started
+
+
 def local_input_sample(hwnd):
     class LastInputInfo(ctypes.Structure):
         _fields_ = [('cbSize', wintypes.UINT), ('dwTime', wintypes.DWORD)]

@@ -11,7 +11,7 @@ Document: Robot Design
 
 ## Features
 
-- Displays **Onshape** with your current document and selected tab.
+- Displays **Onshape** with your current document and selected tab. The elapsed timer tracks the continuous open Onshape session across document, tab, feature, and idle changes. It starts when an Onshape document is first detected, and starts a new session after no Onshape document is detected for 30 seconds. Brief loading gaps do not reset it; restarting this helper starts a new timer.
 - Identifies **Part Studio**, **Assembly**, **Drawing**, **Variable Studio**, **Bill of Materials**, and imported files.
 - Reads the selected Onshape page URL through Windows accessibility, including installed Onshape browser apps. Duplicate tab names and non-default workspaces are resolved using their IDs.
 - Uses the Onshape logo and provides a **View in Onshape** button; document access is enforced by Onshape.

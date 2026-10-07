@@ -1,8 +1,19 @@
 import unittest
-from activity_tracker import ActivityTracker
+from activity_tracker import ActivityTracker, SessionTimer
 from main import make_presence
 
 class ActivityTrackerTests(unittest.TestCase):
+    def test_session_time_survives_switches_and_short_loading_gaps(self):
+        timer = SessionTimer()
+        self.assertIsNone(timer.update(False, 0))
+        self.assertEqual(timer.update(True, 100), 100)
+        self.assertEqual(timer.update(True, 200), 100)
+        timer.update(False, 210)
+        self.assertEqual(timer.update(True, 220), 100)
+        timer.update(False, 230)
+        self.assertIsNone(timer.update(False, 260))
+        self.assertEqual(timer.update(True, 300), 300)
+
     def test_closed_feature_is_retained_until_fifteen_minutes(self):
         tracker = ActivityTracker()
         feature = {'label': 'Extrude', 'name': 'Extrude 72'}

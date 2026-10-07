@@ -17,7 +17,7 @@ from snapshot_bridge import SnapshotBridge
 from api_budget import ApiBudget, BudgetExhausted
 from active_url import UrlReader
 from feature_activity import feature_activity
-from activity_tracker import ActivityTracker, local_input_sample
+from activity_tracker import ActivityTracker, SessionTimer, local_input_sample
 
 ROOT = Path(__file__).resolve().parent
 load_dotenv(ROOT / '.env')
@@ -233,14 +233,14 @@ def run():
     api = Onshape()
     bridge = SnapshotBridge()
     tracker = ActivityTracker()
+    session_timer = SessionTimer()
     rpc = None
-    current = None
-    started = int(time.time())
     last_payload = None
     last_sent = 0
     while True:
         try:
             tab = open_onshape_tab()
+            started = session_timer.update(bool(tab))
             api.budget.tick(bool(tab))
             if rpc is None:
                 candidate = Presence(CLIENT_ID)
@@ -262,7 +262,6 @@ def run():
                 if last_payload is not None:
                     rpc.clear()
                     last_payload = None
-                current = None
                 time.sleep(POLL_SECONDS)
                 continue
             document, wid, element = resolved
@@ -270,9 +269,6 @@ def run():
             if element and element.get('elementType') == 'UNKNOWN' and _browser_state.get('part_studio'):
                 element['elementType'] = 'PARTSTUDIO'
             identity = (document['id'], wid, element['id'] if element else tab[1])
-            if identity != current:
-                started = int(time.time())
-                current = identity
             kind = element.get('elementType') if element else 'UNKNOWN'
             activity = tracker.update(identity, kind, feature_activity(_browser_state), local_input_sample(_onshape_hwnd))
             payload = make_presence(document, element, element['name'] if element else tab[1], started, wid, activity)
