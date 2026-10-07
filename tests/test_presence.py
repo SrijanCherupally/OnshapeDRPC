@@ -3,11 +3,12 @@ from unittest.mock import Mock
 from unittest.mock import patch
 from io import BytesIO
 import tempfile
+import itertools
 from pathlib import Path
 import requests
 from PIL import Image, ImageDraw
 import main
-from snapshot_bridge import SnapshotBridge, blur_snapshot
+from snapshot_bridge import SnapshotBridge, blur_snapshot, render_parameters
 
 
 class PresenceTests(unittest.TestCase):
@@ -60,6 +61,7 @@ class PresenceTests(unittest.TestCase):
         image.save(original, 'PNG')
         raw = original.getvalue()
         api = Mock()
+        api.get.side_effect = ValueError('Rendering unavailable')
         api.session.get.return_value.ok = True
         api.session.get.return_value.content = raw
         bridge = SnapshotBridge(port=0)
@@ -95,7 +97,7 @@ class PresenceTests(unittest.TestCase):
         finally:
             bridge.close()
 
-    def test_snapshot_preserves_native_size_and_both_ends(self):
+    def test_snapshot_fits_both_ends_without_cutting_geometry(self):
         source = Image.new('RGB', (600, 200), 'red')
         draw = ImageDraw.Draw(source)
         draw.rectangle((0, 0, 100, 199), fill='lime')
@@ -103,11 +105,20 @@ class PresenceTests(unittest.TestCase):
         data = BytesIO()
         source.save(data, 'PNG')
         result = Image.open(BytesIO(blur_snapshot(data.getvalue())))
-        self.assertEqual(result.size, (600, 200))
-        left, right = result.getpixel((40, 100)), result.getpixel((560, 100))
+        self.assertEqual(result.size, (300, 300))
+        left, right = result.getpixel((35, 150)), result.getpixel((265, 150))
         self.assertGreater(left[1], left[0])
         self.assertGreater(right[2], right[0])
-        self.assertEqual(result.getpixel((300, 30)), (255, 0, 0))
+        self.assertEqual(result.getpixel((150, 30)), (43, 45, 49))
+
+    def test_render_fits_all_corners_for_model_far_from_origin(self):
+        bounds = {'lowX': 100, 'highX': 104, 'lowY': -80, 'highY': -70, 'lowZ': 20, 'highZ': 35}
+        params = render_parameters(bounds)
+        matrix = [float(v) for v in params['viewMatrix'].split(',')]
+        for corner in itertools.product(*[(bounds['low'+a], bounds['high'+a]) for a in 'XYZ']):
+            for offset in [0, 4]:
+                projected = sum(matrix[offset+i] * corner[i] for i in range(3)) + matrix[offset+3]
+                self.assertLessEqual(abs(projected) / params['pixelSize'], 284.00001)
 
 
 if __name__ == '__main__':

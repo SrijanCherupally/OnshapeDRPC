@@ -1,18 +1,58 @@
 """Publish only heavily blurred model thumbnails through a temporary tunnel."""
 import atexit
+import base64
+import binascii
 import hashlib
 from io import BytesIO
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import math
 from pathlib import Path
 import re
 import secrets
 import subprocess
 import threading
 import time
-from PIL import Image, ImageFilter
+import requests
+from PIL import Image, ImageFilter, ImageOps
 
 ROOT = Path(__file__).resolve().parent
+
+
+def render_parameters(bounds):
+    """Center the bounding box and fit its projected corners in an isometric view."""
+    center = [(bounds['high' + axis] + bounds['low' + axis]) / 2 for axis in 'XYZ']
+    spans = [bounds['high' + axis] - bounds['low' + axis] for axis in 'XYZ']
+    if not all(math.isfinite(v) for v in center + spans) or min(spans) < 0:
+        raise ValueError('Invalid model bounds')
+    rows = [(1 / math.sqrt(2), 1 / math.sqrt(2), 0),
+            (-1 / math.sqrt(6), 1 / math.sqrt(6), math.sqrt(2 / 3)),
+            (1 / math.sqrt(3), -1 / math.sqrt(3), 1 / math.sqrt(3))]
+    matrix = [value for row in rows for value in (*row, -sum(row[i] * center[i] for i in range(3)))]
+    span = max(sum(abs(row[i]) * spans[i] for i in range(3)) for row in rows[:2])
+    return {'viewMatrix': ','.join(str(v) for v in matrix), 'pixelSize': max(span / 568, 1e-9),
+            'outputWidth': 600, 'outputHeight': 600}
+
+
+def fetch_snapshot(api, document, context, element):
+    did, wvm, eid = document['id'], document.get('_wvm', 'w'), element['id']
+    category = {'ASSEMBLY': 'assemblies', 'PARTSTUDIO': 'partstudios'}.get(element.get('elementType'))
+    if category:
+        prefix = f'/{category}/d/{did}/{wvm}/{context}/e/{eid}'
+        try:
+            bounds = api.get(prefix + '/boundingboxes')
+            rendered = api.get(prefix + '/shadedviews', render_parameters(bounds))
+            image = rendered['images'][0]
+            if len(image) > 3 * 1024 * 1024:
+                raise ValueError('Render too large')
+            return base64.b64decode(image, validate=True)
+        except (requests.RequestException, KeyError, IndexError, TypeError, ValueError, binascii.Error):
+            pass
+    # Other tab types, or unavailable render APIs, use the wider thumbnail.
+    response = api.session.get(
+        f'https://cad.onshape.com/api/thumbnails/d/{did}/{wvm}/{context}/e/{eid}/s/600x340',
+        headers={'Accept': 'image/png'}, timeout=15)
+    return response.content if response.ok else b''
 
 
 def blur_snapshot(data):
@@ -20,13 +60,15 @@ def blur_snapshot(data):
     with Image.open(BytesIO(data)) as source:
         source.load()
         rgba = source.convert('RGBA')
-        background = Image.new('RGBA', rgba.size, (43, 45, 49, 255))
-        background.alpha_composite(rgba)
-        # Preserve the source canvas and framing; low-resolution processing
-        # is only used to obscure fine details before restoring native size.
-        reduced_size = tuple(max(1, round(side * 64 / 300)) for side in rgba.size)
-        image = background.convert('RGB').resize(reduced_size, Image.Resampling.BOX)
-        image = image.resize(rgba.size, Image.Resampling.BICUBIC)
+        visible = rgba.getchannel('A').getbbox()
+        if visible is None:
+            raise ValueError('Empty render')
+        # Remove only unused transparent background, then fit all visible geometry.
+        fitted = ImageOps.contain(rgba.crop(visible), (276, 276), Image.Resampling.LANCZOS)
+        background = Image.new('RGBA', (300, 300), (43, 45, 49, 255))
+        background.alpha_composite(fitted, ((300 - fitted.width) // 2, (300 - fitted.height) // 2))
+        image = background.convert('RGB').resize((64, 64), Image.Resampling.BOX)
+        image = image.resize((300, 300), Image.Resampling.BICUBIC)
         image = image.filter(ImageFilter.GaussianBlur(radius=8))
         output = BytesIO()
         image.save(output, format='PNG')
@@ -107,18 +149,15 @@ class SnapshotBridge:
         if old and time.monotonic() - old[0] < 90:
             path = old[1]
         else:
-            did, wvm, wid, eid = key
-            response = api.session.get(
-                f'https://cad.onshape.com/api/thumbnails/d/{did}/{wvm}/{wid}/e/{eid}/s/300x300',
-                headers={'Accept': 'image/png'}, timeout=15)
-            if not response.ok or not response.content.startswith(b'\x89PNG\r\n\x1a\n'):
+            raw = fetch_snapshot(api, document, context, element)
+            if not raw.startswith(b'\x89PNG\r\n\x1a\n'):
                 self.clear()
                 return 'onshape_logo'
-            if len(response.content) > 2 * 1024 * 1024:
+            if len(raw) > 2 * 1024 * 1024:
                 self.clear()
                 return 'onshape_logo'
             try:
-                data = blur_snapshot(response.content)
+                data = blur_snapshot(raw)
             except (OSError, ValueError, Image.DecompressionBombError):
                 self.clear()
                 return 'onshape_logo'

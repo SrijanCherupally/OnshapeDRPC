@@ -16,7 +16,7 @@ Document: Robot Design
 - Reads the selected Onshape page URL through Windows accessibility, including installed Onshape browser apps. Duplicate tab names and non-default workspaces are resolved using their IDs.
 - Uses the Onshape logo and provides a **View in Onshape** button; document access is enforced by Onshape.
 - Displays a heavily blurred thumbnail while preserving the overall model silhouette.
-- Updates tab selection every 15 seconds and checks thumbnails every 90 seconds.
+- Updates tab selection every 15 seconds and checks previews every 90 seconds.
 - Runs silently, starts at Windows login, reconnects when Discord becomes available, and prevents duplicate instances.
 - Keeps rotating local diagnostic logs instead of requiring a console window.
 
@@ -82,7 +82,9 @@ To disable automatic startup, open `shell:startup` using Win + R and delete `Ons
 
 Discord cannot enforce Onshape document permissions for Rich Presence images. This app displays a deliberately blurred preview publicly, while the **View in Onshape** button opens the full model with Onshape's normal sign-in and document access checks.
 
-The app downloads the selected element's 300 x 300 PNG thumbnail using your existing credentials. Before it is shared, Pillow keeps the thumbnail at its native size and framing, with no added padding, cropping, or zoom. Transparency is composited onto a neutral background. To obscure fine details, the image is processed at 64 x 64, restored to its native 300 x 300 canvas, and given an 8-pixel Gaussian blur. This obscures small details while retaining the general shape. Original image metadata is discarded.
+For Assemblies and Part Studios, the app reads the model bounding box and requests a fresh isometric shaded render. The camera is centered on the model and its scale is chosen to include every projected bounding-box corner, preventing the clipping present in some cached Onshape thumbnails. Other tab types, or unavailable render APIs, use a wider generated thumbnail as a fallback.
+
+Pillow removes unused transparent background and fits all visible geometry proportionally into the square Discord preview, with a small border to keep the blurred edges inside the image. Only empty background is cropped. The blur stays at 64 x 64 detail reduction and an 8-pixel Gaussian blur on a 300 x 300 canvas. This obscures small details while retaining the general shape. Original image metadata is discarded.
 
 Only the resulting blurred PNG is placed in the image server's memory. Original thumbnails are never exposed by the server. If image decoding or blurring fails, the app uses the Onshape logo; it never falls back to sharing an unblurred image.
 
@@ -90,7 +92,7 @@ A local server on 127.0.0.1:19288 serves the blurred image at an unpredictable p
 
 **The blurred image is accessible to anyone with its URL and is processed by Cloudflare and Discord. Blurring is a visual treatment, not an access-control guarantee.** Document and tab names are also visible to anyone who can view your Discord activity. People may still recognize the model's silhouette. Existing unblurred images from earlier revisions may remain in Discord caches; the app cannot revoke cached copies.
 
-Snapshots are Onshape-generated thumbnails rather than captures of your exact viewport. They change when you switch elements and are checked every 90 seconds. Some element types have no suitable thumbnail. The logo is used if a thumbnail or tunnel is unavailable. Old paths are removed when the current preview changes or no visible Onshape window is found.
+Snapshots are isometric API renders or fallback thumbnails rather than captures of your exact viewport. They change when you switch elements and are checked every 90 seconds. Some element types have no suitable thumbnail. The logo is used if a thumbnail or tunnel is unavailable. Old paths are removed when the current preview changes or no visible Onshape window is found.
 
 Quick Tunnels need no Cloudflare account, but are intended for testing and development and have no uptime guarantee. Their hostname changes at app restart; the presence updates automatically. The helper launches silently at login and retries after exiting. This integration remains experimental.
 
