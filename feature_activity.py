@@ -1,5 +1,7 @@
 """Interpret only the open feature editor, never toolbar or feature-list text."""
 import re
+import json
+from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
 LABELS = {
@@ -14,6 +16,11 @@ LABELS = {
     'sheetmetal': 'Sheet Metal', 'sheetmetalmodel': 'Sheet Metal', 'rib': 'Rib',
     'wrap': 'Wrap', 'helix': 'Helix', 'plane': 'Plane', 'frame': 'Frame',
 }
+
+
+for _name in json.loads((Path(__file__).resolve().parent / 'assets/onshape-icons/sources.json').read_text(encoding='utf-8')):
+    if _name not in {'Onshape', 'Assembly'}:
+        LABELS.setdefault(re.sub(r'[^a-z]', '', _name.casefold()), _name.title().replace('Pcb', 'PCB'))
 
 
 def feature_activity(observation):

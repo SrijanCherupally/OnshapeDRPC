@@ -1,0 +1,310 @@
+{
+  "Extrude": {
+    "file": "extrude.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/extrude-button@3x.png"
+  },
+  "Revolve": {
+    "file": "revolve.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/revolve-button@3x.png"
+  },
+  "Sweep": {
+    "file": "sweep.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/sweep-button@3x.png"
+  },
+  "Loft": {
+    "file": "loft.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/loft-button@3x.png"
+  },
+  "Thicken": {
+    "file": "thicken.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/thicken-button@3x.png"
+  },
+  "Enclose": {
+    "file": "enclose.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/enclose-button@3x.png"
+  },
+  "Fillet": {
+    "file": "fillet.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/fillet-button@3x.png"
+  },
+  "Face blend": {
+    "file": "face-blend.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/face-blend-button@3x.png"
+  },
+  "Chamfer": {
+    "file": "chamfer.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/chamfer-button@3x.png"
+  },
+  "Draft": {
+    "file": "draft.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/draft-button@3x.png"
+  },
+  "Body draft": {
+    "file": "body-draft.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/body-draft-button@3x.png"
+  },
+  "Rib": {
+    "file": "rib.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/rib-button@3x.png"
+  },
+  "Shell": {
+    "file": "shell.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/shell-button@3x.png"
+  },
+  "Hole": {
+    "file": "hole.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/hole-button@3x.png"
+  },
+  "External thread": {
+    "file": "external-thread.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/external-thread-button@3x.png"
+  },
+  "Linear pattern": {
+    "file": "linear-pattern.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/linear-pattern-button@3x.png"
+  },
+  "Circular pattern": {
+    "file": "circular-pattern.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/circular-pattern-button@3x.png"
+  },
+  "Curve pattern": {
+    "file": "curve-pattern.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/curve-pattern-button@3x.png"
+  },
+  "Mirror": {
+    "file": "mirror.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/mirror-button@3x.png"
+  },
+  "Boolean": {
+    "file": "boolean.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/boolean-bodies-button@3x.png"
+  },
+  "Split": {
+    "file": "split.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/split-part-button@3x.png"
+  },
+  "Transform": {
+    "file": "transform.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/transform-button@3x.png"
+  },
+  "Decal": {
+    "file": "decal.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/decal-button@3x.png"
+  },
+  "Delete part": {
+    "file": "delete-part.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/delete-bodies-button@3x.png"
+  },
+  "Modify fillet": {
+    "file": "modify-fillet.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/modify-fillet-button@3x.png"
+  },
+  "Delete face": {
+    "file": "delete-face.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/delete-face-button@3x.png"
+  },
+  "Move face": {
+    "file": "move-face.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/move-face-button@3x.png"
+  },
+  "Replace face": {
+    "file": "replace-face.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/replace-face-button@3x.png"
+  },
+  "Plane": {
+    "file": "plane.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/default-plane-button@3x.png"
+  },
+  "Offset surface": {
+    "file": "offset-surface.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/offset-surface-button@3x.png"
+  },
+  "Boundary surface": {
+    "file": "boundary-surface.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/boundary-surface-button@3x.png"
+  },
+  "Fill": {
+    "file": "fill.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/fill-button@3x.png"
+  },
+  "Move boundary": {
+    "file": "move-boundary.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons/extend-surface-button@3x.png"
+  },
+  "Ruled surface": {
+    "file": "ruled-surface.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/ruled-surface-button@3x.png"
+  },
+  "Mutual trim": {
+    "file": "mutual-trim.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/mutual-trim-button@3x.png"
+  },
+  "Constrained surface": {
+    "file": "constrained-surface.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/constrained-surface-button@3x.png"
+  },
+  "Helix": {
+    "file": "helix.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/helix-button@3x.png"
+  },
+  "3D fit spline": {
+    "file": "3d-fit-spline.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/fit-spline-button@3x.png"
+  },
+  "Projected curve": {
+    "file": "projected-curve.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/project-curves-button@3x.png"
+  },
+  "Bridging curve": {
+    "file": "bridging-curve.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/bridging-curve-button@3x.png"
+  },
+  "Composite curve": {
+    "file": "composite-curve.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/composite-curve-button@3x.png"
+  },
+  "Intersection curve": {
+    "file": "intersection-curve.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/intersection-curve-button@3x.png"
+  },
+  "Trim curve": {
+    "file": "trim-curve.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/trim-curve-button@3x.png"
+  },
+  "Isocline": {
+    "file": "isocline.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/isocline-button@3x.png"
+  },
+  "Offset curve": {
+    "file": "offset-curve.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/offset-curve-button@3x.png"
+  },
+  "Isoparametric curve": {
+    "file": "isoparametric-curve.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/isoparametric-curve-button@3x.png"
+  },
+  "Edit curve": {
+    "file": "edit-curve.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/edit-curve-button@3x.png"
+  },
+  "Routing curve": {
+    "file": "routing-curve.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/routing-curve-button@3x.png"
+  },
+  "Mate connector": {
+    "file": "mate-connector.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/mateConnector@3x.png"
+  },
+  "Derived": {
+    "file": "derived.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/import-derived-button@3x.png"
+  },
+  "Variable": {
+    "file": "variable.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/variablestudio@3x.png"
+  },
+  "Query variable": {
+    "file": "query-variable.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/query-variable-button@3x.png"
+  },
+  "Composite part": {
+    "file": "composite-part.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/composite-part-button@3x.png"
+  },
+  "Tag": {
+    "file": "tag.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/tag-button@3x.png"
+  },
+  "Frame": {
+    "file": "frame.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/frame-button@3x.png"
+  },
+  "Frame trim": {
+    "file": "frame-trim.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/frame-trim-button@3x.png"
+  },
+  "Gusset": {
+    "file": "gusset.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/gusset-button@3x.png"
+  },
+  "End cap": {
+    "file": "end-cap.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/endcap-button@3x.png"
+  },
+  "Cut list": {
+    "file": "cut-list.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/cutlist-button@3x.png"
+  },
+  "Sheet metal model": {
+    "file": "sheet-metal-model.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/sheet-metal-start-button@3x.png"
+  },
+  "Flange": {
+    "file": "flange.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/sheet-metal-flange-button@3x.png"
+  },
+  "Hem": {
+    "file": "hem.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/sheet-metal-hem-button@3x.png"
+  },
+  "Tab": {
+    "file": "tab.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/sheet-metal-tab-button@3x.png"
+  },
+  "Bend": {
+    "file": "bend.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/sheet-metal-bend-button@3x.png"
+  },
+  "Form": {
+    "file": "form.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/sheet-metal-form-button@3x.png"
+  },
+  "Sheet metal loft": {
+    "file": "sheet-metal-loft.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/sheet-metal-loft-button@3x.png"
+  },
+  "Make joint": {
+    "file": "make-joint.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/sheet-metal-make-joint-button@3x.png"
+  },
+  "Corner": {
+    "file": "corner.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/sheet-metal-corner-button@3x.png"
+  },
+  "Bend relief": {
+    "file": "bend-relief.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/sheet-metal-bend-relief-button@3x.png"
+  },
+  "Corner break": {
+    "file": "corner-break.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/sheet-metal-corner-break-button@3x.png"
+  },
+  "Finish sheet metal model": {
+    "file": "finish-sheet-metal-model.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/sheet-metal-end-button@3x.png"
+  },
+  "Flex PCB model": {
+    "file": "flex-pcb-model.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/pcb-start-button@3x.png"
+  },
+  "Finish flex PCB\u00a0model": {
+    "file": "finish-flex-pcb-model.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/pcb-end-button@3x.png"
+  },
+  "Sketch": {
+    "file": "sketch.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons/sketch-icon@1x.png"
+  },
+  "Assembly": {
+    "file": "assembly.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/assembly@3x.png"
+  },
+  "Onshape": {
+    "file": "onshape.png",
+    "source": "https://cad.onshape.com/favicon.png"
+  },
+  "Wrap": {
+    "file": "wrap.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/wrap-button@3x.png"
+  }
+}

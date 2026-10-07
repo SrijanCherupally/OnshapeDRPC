@@ -8,9 +8,18 @@ from active_url import UrlReader
 from feature_activity import feature_activity
 from snapshot_bridge import SnapshotBridge
 from main import make_presence
+from feature_badge import SOURCES, feature_badge
+from PIL import Image
+from io import BytesIO
 
 
 class FeatureTests(unittest.TestCase):
+    def test_all_bundled_native_icons_render_and_idle_is_branded(self):
+        for name in SOURCES:
+            with self.subTest(name=name):
+                self.assertEqual(Image.open(BytesIO(feature_badge(name))).size, (300, 300))
+        self.assertNotEqual(feature_badge('Idle'), feature_badge('Extrude'))
+
     def test_renamed_features_use_editor_help_link(self):
         for topic, label in [('extrude', 'Extrude'), ('sketch_tools', 'Sketch'), ('linear_pattern', 'Linear Pattern')]:
             activity = feature_activity({'available': True, 'part_studio': True, 'feature': {
@@ -34,10 +43,12 @@ class FeatureTests(unittest.TestCase):
         doc = {'id': 'doc', 'name': 'Biobuzz'}
         element = {'id': 'tab', 'elementType': 'PARTSTUDIO'}
         payload = make_presence(doc, element, 'Turret', 1, 'ws', {'label': 'Sketch', 'name': 'Sketch 67'})
-        self.assertEqual(payload['details'], 'Part Studio: Turret')
-        self.assertEqual(payload['state'], 'Sketch: Sketch 67 | Document: Biobuzz')
+        self.assertEqual(payload['details'], 'Part Studio: Turret · Sketch 67')
+        self.assertEqual(payload['state'], 'Document: Biobuzz')
+        renamed = make_presence(doc, element, 'Turret', 1, activity={'label': 'Extrude', 'name': 'Motor Mount'})
+        self.assertEqual(renamed['details'], 'Part Studio: Turret · Extrude: Motor Mount')
         self.assertEqual(make_presence(doc, element, 'Turret', 1, activity={'label': 'Idle', 'name': ''})['state'],
-                         'Idle | Document: Biobuzz')
+                         'Document: Biobuzz')
         element['elementType'] = 'ASSEMBLY'
         self.assertEqual(make_presence(doc, element, 'Turret', 1, activity={'label': 'Idle', 'name': ''})['state'],
                          'Document: Biobuzz')
@@ -54,6 +65,9 @@ class FeatureTests(unittest.TestCase):
             with tempfile.TemporaryDirectory() as directory, patch('snapshot_bridge.ROOT', Path(directory)), patch('snapshot_bridge.fetch_snapshot') as fetch:
                 self.assertEqual(bridge.publish(api, {'id': 'doc'}, 'ws', element), 'onshape_logo')
                 url = bridge.publish_feature({'id': 'doc', 'name': 'Biobuzz'}, element, {'label': 'Extrude', 'name': 'Extrude 72'})
+                self.assertEqual(requests.get(url, timeout=3).status_code, 200)
+                symbol = bridge.publish_symbol('Assembly')
+                self.assertEqual(requests.get(symbol, timeout=3).status_code, 200)
                 self.assertEqual(requests.get(url, timeout=3).status_code, 200)
                 self.assertEqual(requests.get(bridge.hostname + old_path, timeout=3).status_code, 404)
                 status = json.loads(Path(directory, 'snapshot-status.json').read_text())

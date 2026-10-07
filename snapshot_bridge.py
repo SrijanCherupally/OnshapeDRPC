@@ -300,6 +300,14 @@ class SnapshotBridge:
             self.last_status = status
         return url
 
+    def publish_symbol(self, label):
+        self.ensure_tunnel()
+        data = feature_badge(label, compact=True)
+        path = f'/{self.token}/symbol-{hashlib.sha256(data).hexdigest()[:24]}.png'
+        with self.lock:
+            self.images[path] = data
+        return self.hostname + path if self.hostname else 'onshape_logo'
+
     def close(self):
         self.executor.shutdown(wait=False, cancel_futures=True)
         if self.process and self.process.poll() is None:

@@ -40,7 +40,7 @@ class PresenceTests(unittest.TestCase):
             with self.subTest(kind=kind):
                 payload = main.make_presence({'name': 'Robot'}, {'elementType': kind}, 'Intake', 1)
                 self.assertEqual(payload['name'], 'Onshape')
-                self.assertEqual(payload['details'], label + ': Intake')
+                self.assertEqual(payload['details'].split(' · ')[0], label + ': Intake')
         self.assertEqual(main.parse_title('Onshape - Robot | Intake - Brave'), ('Robot', 'Intake'))
         self.assertIsNone(main.parse_title('GitHub - Brave'))
 

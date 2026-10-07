@@ -205,9 +205,11 @@ def make_presence(document, element, tab_name, start, context=None, activity=Non
         activity = activity or {'label': 'Unavailable', 'name': ''}
         label = activity['label']
         text = 'Feature Detection Unavailable' if label == 'Unavailable' else label
-        if activity.get('name') and activity['name'] != label:
-            text += ': ' + activity['name']
-        payload['state'] = f"{text} | Document: {document['name']}"[:128]
+        feature_name = activity.get('name', '')
+        if feature_name and feature_name != label:
+            # Default feature names already include their type (Extrude 72).
+            text = feature_name if re.fullmatch(re.escape(label) + r'\s+\d+', feature_name, re.I) else text + ': ' + feature_name
+        payload['details'] = f'{details} · {text}'[:128]
         payload['large_text'] = text[:128]
     if context and element:
         url = f"https://cad.onshape.com/documents/{document['id']}/{document.get('_wvm', 'w')}/{context}/e/{element['id']}"
@@ -271,6 +273,9 @@ def run():
                 payload['large_image'] = bridge.publish_feature(document, element, activity)
             else:
                 payload['large_image'] = bridge.publish(api, document, wid, element, blocking=False)
+                if element and element.get('elementType') == 'ASSEMBLY':
+                    payload['small_image'] = bridge.publish_symbol('Assembly')
+                    payload['small_text'] = 'Assembly'
             if payload != last_payload and time.monotonic() - last_sent >= PRESENCE_MIN_SECONDS:
                 reply = rpc.update(**payload)
                 accepted = reply.get('data') or {}

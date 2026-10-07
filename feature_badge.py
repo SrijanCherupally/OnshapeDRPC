@@ -1,43 +1,54 @@
-"""Local feature artwork; contains no model image and needs no Onshape requests."""
+"""Display bundled Onshape icons; no model content or network requests."""
 from functools import lru_cache
 from io import BytesIO
+import json
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageFont
+import re
+from PIL import Image, ImageDraw, ImageFont, ImageOps
+
+ASSETS = Path(__file__).resolve().parent / 'assets' / 'onshape-icons'
+SOURCES = json.loads((ASSETS / 'sources.json').read_text(encoding='utf-8'))
+ICONS = {re.sub(r'[^a-z0-9]', '', name.casefold()): item['file'] for name, item in SOURCES.items()}
+ICONS['sheetmetal'] = ICONS['sheetmetalmodel']
 
 
-@lru_cache(maxsize=64)
-def feature_badge(label):
-    image = Image.new('RGB', (300, 300), (43, 45, 49))
+@lru_cache(maxsize=128)
+def feature_badge(label, compact=False):
+    image = Image.new('RGBA', (300, 300), (43, 45, 49, 255))
     draw = ImageDraw.Draw(image)
-    green = (109, 190, 68)
-    white = (235, 237, 239)
-    if label == 'Idle':
-        draw.ellipse((92, 51, 208, 167), outline=green, width=9)
-        draw.line((150, 74, 150, 111, 177, 128), fill=white, width=9)
-    elif label == 'Sketch':
-        draw.rounded_rectangle((76, 55, 205, 172), radius=8, outline=green, width=7)
-        draw.line((103, 142, 184, 68), fill=white, width=14)
-        draw.polygon([(96, 149), (101, 129), (115, 142)], fill=white)
-    elif label == 'Extrude':
-        draw.polygon([(84, 93), (150, 59), (215, 93), (150, 129)], fill=green)
-        draw.polygon([(84, 93), (150, 129), (150, 185), (84, 149)], outline=white, width=5)
-        draw.polygon([(150, 129), (215, 93), (215, 149), (150, 185)], outline=white, width=5)
-        draw.line((150, 49, 150, 23), fill=white, width=6)
-        draw.polygon([(137, 35), (150, 17), (163, 35)], fill=white)
+    key = re.sub(r'[^a-z0-9]', '', label.casefold())
+    filename = ICONS.get(key, ICONS['onshape'])
+    branded = filename == ICONS['onshape']
+    if branded:
+        draw.ellipse((33, 7, 267, 241), fill=(40, 55, 45), outline=(58, 83, 60), width=2)
+        area, top = (190, 190), 28
+    elif compact:
+        draw.rounded_rectangle((12, 12, 288, 288), radius=42, fill=(239, 242, 245))
+        area, top = (232, 232), 34
     else:
-        draw.rounded_rectangle((86, 58, 214, 172), radius=16, outline=green, width=8)
-        for y in (87, 116, 145):
-            draw.line((113, y, 188, y), fill=white, width=6)
-            draw.ellipse((98, y-4, 106, y+4), fill=green)
-    words = ['Detection', 'Unavailable'] if label == 'Unavailable' else label.split()
-    size = 30 if max(map(len, words)) > 10 else 36
-    font = ImageFont.load_default(size=size)
-    for path in (Path('C:/Windows/Fonts/seguisb.ttf'), Path('C:/Windows/Fonts/segoeui.ttf')):
-        if path.exists():
-            font = ImageFont.truetype(str(path), size)
-            break
-    for index, word in enumerate(words):
-        draw.text((150, 213 + index*39), word, font=font, fill=white, anchor='mm')
+        draw.rounded_rectangle((42, 22, 258, 222), radius=28, fill=(239, 242, 245))
+        area, top = (164, 164), 40
+    with Image.open(ASSETS / filename) as source:
+        icon = source.convert('RGBA')
+        bounds = icon.getchannel('A').getbbox()
+        if bounds:
+            icon = icon.crop(bounds)
+        icon = ImageOps.contain(icon, area, Image.Resampling.LANCZOS)
+        image.alpha_composite(icon, ((300-icon.width)//2, top+(area[1]-icon.height)//2))
+    if not compact:
+        caption = 'Onshape' if label == 'Unavailable' else label
+        size = 33
+        font_path = None
+        for path in (Path('C:/Windows/Fonts/seguisb.ttf'), Path('C:/Windows/Fonts/segoeui.ttf')):
+            if path.exists():
+                font_path = str(path)
+                break
+        while True:
+            font = ImageFont.truetype(font_path, size) if font_path else ImageFont.load_default(size=size)
+            if draw.textlength(caption, font=font) <= 264 or size <= 16:
+                break
+            size -= 1
+        draw.text((150, 260), caption, font=font, fill=(235, 237, 239), anchor='mm')
     output = BytesIO()
-    image.save(output, 'PNG')
+    image.convert('RGB').save(output, 'PNG')
     return output.getvalue()

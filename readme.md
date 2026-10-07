@@ -4,8 +4,8 @@ Discord Rich Presence for Onshape on Windows, with per-document blur settings an
 
 ```text
 Onshape
-Part Studio: Intake
-Sketch: Sketch 1 | Document: Robot Design
+Part Studio: Intake · Sketch 1
+Document: Robot Design
 [Sketch feature badge with a small Onshape badge]
 ```
 
@@ -120,7 +120,7 @@ The persistent local accessibility helper reads only the open `feature-dialog` p
 
 When no feature editor is open in a detected Part Studio, the status is **Idle**. Here, Idle means no feature is being edited; it does not measure keyboard/mouse inactivity. If the browser does not expose enough accessibility information, the app reports **Feature Detection Unavailable**, rather than falsely claiming Idle. Feature activity is read about once a second and uses the existing 5-second minimum between changed Discord submissions.
 
-Part Studios show a locally generated feature badge instead of a CAD snapshot. Only the feature type is drawn in the badge; the editor name appears in the activity text and image hover text. Badges use the same tunnel as Assembly previews and require no Onshape API requests. Feature names are visible to people who can see your Discord activity. Assemblies keep their fitted previews and existing blur rules.
+Part Studios show a locally generated feature badge instead of a CAD snapshot. The badges use bundled native Onshape feature icons, with their original artwork fitted onto a light tile for contrast. Idle uses the Onshape logo on a dark green backdrop. Assemblies use the native Assembly icon as their small badge while retaining the model snapshot. Only the feature type is drawn in the badge; the editor name appears alongside the Part Studio name and in image hover text. The document always has its own line underneath. Default names such as Extrude 72 are shown once, without a repeated Extrude prefix. Icon source URLs are recorded in assets/onshape-icons/sources.json; unknown custom features use Onshape branding. Badges use the same tunnel as Assembly previews and require no Onshape API requests. Feature names are visible to people who can see your Discord activity. Assemblies keep their fitted previews and existing blur rules.
 
 ## Troubleshooting
 
