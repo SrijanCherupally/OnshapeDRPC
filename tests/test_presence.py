@@ -1,8 +1,6 @@
 import unittest
 from unittest.mock import Mock
-import requests
 import main
-from snapshot_bridge import SnapshotBridge
 
 
 class PresenceTests(unittest.TestCase):
@@ -25,37 +23,26 @@ class PresenceTests(unittest.TestCase):
         api.get = Mock(return_value=[{'id': 'a', 'name': 'Intake'}, {'id': 'b', 'name': 'Intake'}])
         document, _, element = api.resolve(('Robot', 'Intake'))
         self.assertIsNone(element)
-        payload = main.make_presence(document, element, 'Intake', 1, 'onshape_logo')
+        payload = main.make_presence(document, element, 'Intake', 1)
         self.assertEqual(payload['details'], 'Tab: Intake')
 
     def test_tab_labels(self):
         for kind, label in [('PARTSTUDIO', 'Part Studio'), ('ASSEMBLY', 'Assembly'), ('DRAWING', 'Drawing')]:
             with self.subTest(kind=kind):
-                payload = main.make_presence({'name': 'Robot'}, {'elementType': kind}, 'Intake', 1, 'image')
+                payload = main.make_presence({'name': 'Robot'}, {'elementType': kind}, 'Intake', 1)
                 self.assertEqual(payload['name'], 'Onshape')
                 self.assertEqual(payload['details'], label + ': Intake')
         self.assertEqual(main.parse_title('Onshape - Robot | Intake - Brave'), ('Robot', 'Intake'))
         self.assertIsNone(main.parse_title('GitHub - Brave'))
 
-    def test_thumbnail_server_exposes_only_registered_image(self):
-        bridge = SnapshotBridge(port=0)
-        try:
-            base = 'http://127.0.0.1:' + str(bridge.server.server_port)
-            image = b'\x89PNG\r\n\x1a\nexample'
-            path = '/' + bridge.token + '/image.png'
-            with bridge.lock:
-                bridge.images[path] = image
-            response = requests.get(base + path, timeout=3)
-            self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.headers['Content-Type'], 'image/png')
-            self.assertEqual(response.content, image)
-            for forbidden in ['/', '/.env', '/main.py', '/api/users/session', '/wrong/image.png']:
-                self.assertEqual(requests.get(base + forbidden, timeout=3).status_code, 404)
-            with bridge.lock:
-                bridge.images.clear()
-            self.assertEqual(requests.get(base + path, timeout=3).status_code, 404)
-        finally:
-            bridge.close()
+    def test_presence_keeps_images_private_and_links_to_onshape(self):
+        document = {'id': 'doc', 'name': 'Robot', '_wvm': 'v'}
+        element = {'id': 'studio', 'elementType': 'PARTSTUDIO'}
+        payload = main.make_presence(document, element, 'Intake', 1, 'version')
+        self.assertEqual(payload['large_image'], 'onshape_logo')
+        self.assertEqual(payload['small_image'], 'onshape_logo')
+        self.assertEqual(payload['buttons'], [{'label': 'View in Onshape',
+                          'url': 'https://cad.onshape.com/documents/doc/v/version/e/studio'}])
 
 
 if __name__ == '__main__':

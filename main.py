@@ -12,7 +12,6 @@ import time
 import requests
 from dotenv import load_dotenv
 from pypresence import Presence
-from snapshot_bridge import SnapshotBridge
 
 ROOT = Path(__file__).resolve().parent
 load_dotenv(ROOT / '.env')
@@ -139,12 +138,16 @@ class Onshape:
         element = matches[0] if len(matches) == 1 else None
         return document, wid, element
 
-def make_presence(document, element, tab_name, start, image):
+def make_presence(document, element, tab_name, start, context=None):
     kind = LABELS.get(element.get('elementType'), 'Tab') if element else 'Tab'
     details = f'{kind}: {tab_name}'
-    return dict(name='Onshape', details=details[:128], state=f"Document: {document['name']}"[:128],
-                start=start, large_image=image, large_text=details[:128],
-                small_image='onshape_logo', small_text='Onshape')
+    payload = dict(name='Onshape', details=details[:128], state=f"Document: {document['name']}"[:128],
+                   start=start, large_image='onshape_logo', large_text=details[:128],
+                   small_image='onshape_logo', small_text='Onshape')
+    if context and element:
+        url = f"https://cad.onshape.com/documents/{document['id']}/{document.get('_wvm', 'w')}/{context}/e/{element['id']}"
+        payload['buttons'] = [{'label': 'View in Onshape', 'url': url}]
+    return payload
 
 
 def run():
@@ -156,7 +159,6 @@ def run():
     except OSError:
         return
     api = Onshape()
-    bridge = SnapshotBridge()
     rpc = None
     current = None
     started = int(time.time())
@@ -179,7 +181,6 @@ def run():
             tab = open_onshape_tab()
             resolved = api.resolve(tab) if tab else None
             if not resolved:
-                bridge.clear()
                 if last_payload is not None:
                     rpc.clear()
                     last_payload = None
@@ -191,8 +192,7 @@ def run():
             if identity != current:
                 started = int(time.time())
                 current = identity
-            payload = make_presence(document, element, element['name'] if element else tab[1], started,
-                                    bridge.publish(api, document, wid, element))
+            payload = make_presence(document, element, element['name'] if element else tab[1], started, wid)
             if payload != last_payload:
                 reply = rpc.update(**payload)
                 accepted = reply.get('data') or {}
