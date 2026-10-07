@@ -82,7 +82,7 @@ To disable automatic startup, open `shell:startup` using Win + R and delete `Ons
 
 Discord cannot enforce Onshape document permissions for Rich Presence images. This app displays a deliberately blurred preview publicly, while the **View in Onshape** button opens the full model with Onshape's normal sign-in and document access checks.
 
-The app downloads the selected element's 600 x 340 PNG thumbnail using your existing credentials. Before it is shared, Pillow fits the complete image proportionally inside a 252 x 252 area on a 300 x 300 neutral background. This adds at least 24 pixels of padding without cropping or stretching. It then reduces the image to 64 x 64 pixels, enlarges it to 300 x 300, and applies an 8-pixel Gaussian blur. This obscures small details while retaining the general shape. Original image metadata is discarded.
+The app downloads the selected element's 300 x 300 PNG thumbnail using your existing credentials. Before it is shared, Pillow keeps the thumbnail at its native size and framing, with no added padding, cropping, or zoom. Transparency is composited onto a neutral background. To obscure fine details, the image is processed at 64 x 64, restored to its native 300 x 300 canvas, and given an 8-pixel Gaussian blur. This obscures small details while retaining the general shape. Original image metadata is discarded.
 
 Only the resulting blurred PNG is placed in the image server's memory. Original thumbnails are never exposed by the server. If image decoding or blurring fails, the app uses the Onshape logo; it never falls back to sharing an unblurred image.
 
