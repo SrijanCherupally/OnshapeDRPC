@@ -13,13 +13,14 @@ import secrets
 import subprocess
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 import requests
 from PIL import Image, ImageFilter, ImageOps
 from api_budget import BudgetExhausted
 
 ROOT = Path(__file__).resolve().parent
-SNAPSHOT_REFRESH_SECONDS = 1800
-RENDER_SIZE = 300
+SNAPSHOT_REFRESH_SECONDS = 3600
+RENDER_SIZE = 600
 RENDER_MARGIN = 16
 
 
@@ -83,7 +84,7 @@ def fetch_snapshot(api, document, context, element):
     # Other tab types, or unavailable render APIs, use the wider thumbnail.
     response = api.request(
         f'/thumbnails/d/{did}/{wvm}/{context}/e/{eid}/s/300x170',
-        headers={'Accept': 'image/png'}, timeout=15)
+        headers={'Accept': 'image/png'})
     return response.content if response.ok else b''
 
 
@@ -96,9 +97,11 @@ def prepare_snapshot(data, blurred):
         if visible is None:
             raise ValueError('Empty render')
         # Remove only unused transparent background, then fit all visible geometry.
-        fitted = ImageOps.contain(rgba.crop(visible), (276, 276), Image.Resampling.LANCZOS)
-        background = Image.new('RGBA', (300, 300), (43, 45, 49, 255))
-        background.alpha_composite(fitted, ((300 - fitted.width) // 2, (300 - fitted.height) // 2))
+        size = 300 if blurred else 600
+        inset = size * 12 // 300
+        fitted = ImageOps.contain(rgba.crop(visible), (size - 2 * inset, size - 2 * inset), Image.Resampling.LANCZOS)
+        background = Image.new('RGBA', (size, size), (43, 45, 49, 255))
+        background.alpha_composite(fitted, ((size - fitted.width) // 2, (size - fitted.height) // 2))
         image = background.convert('RGB')
         if blurred:
             image = image.resize((64, 64), Image.Resampling.BOX)
@@ -123,6 +126,9 @@ class SnapshotBridge:
         self.last_attempt = 0
         self.last_fetch = {}
         self.last_status = None
+        self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix='preview')
+        self.pending = None
+        self.retry_after = {}
         bridge = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -178,14 +184,42 @@ class SnapshotBridge:
         self.last_status = None
         (ROOT / 'snapshot-status.json').unlink(missing_ok=True)
 
-    def publish(self, api, document, context, element):
+    @staticmethod
+    def cache_file(key):
+        return ROOT / 'preview-cache' / (hashlib.sha256(json.dumps(key).encode()).hexdigest() + '.png')
+
+    @staticmethod
+    def process_preview(api, document, context, element, blurred):
+        raw = fetch_snapshot(api, document, context, element)
+        if not raw.startswith(b'\x89PNG\r\n\x1a\n') or len(raw) > 2 * 1024 * 1024:
+            return None
+        try:
+            return prepare_snapshot(raw, blurred)
+        except (OSError, ValueError, Image.DecompressionBombError):
+            return None
+
+    def publish(self, api, document, context, element, blocking=True):
         if not element:
             self.clear()
             return 'onshape_logo'
         self.ensure_tunnel()
         blurred = should_blur(document)
         key = (document['id'], document.get('_wvm', 'w'), context, element['id'], blurred)
-        cache_file = ROOT / 'preview-cache' / (hashlib.sha256(json.dumps(key).encode()).hexdigest() + '.png')
+        cache_file = self.cache_file(key)
+        if self.pending and self.pending[1].done():
+            completed_key, future = self.pending
+            self.pending = None
+            try:
+                result = future.result()
+            except (requests.RequestException, BudgetExhausted, OSError, ValueError):
+                result = None
+            if result is not None:
+                saved_file = self.cache_file(completed_key)
+                saved_file.parent.mkdir(exist_ok=True)
+                saved_file.write_bytes(result)
+                self.last_fetch.pop(completed_key, None)
+            else:
+                self.retry_after[completed_key] = time.monotonic() + 300
         old = self.last_fetch.get(key)
         if (not old or old[1] not in self.images) and cache_file.exists():
             saved = cache_file.read_bytes()
@@ -200,14 +234,29 @@ class SnapshotBridge:
         if old and (time.monotonic() - old[0] < SNAPSHOT_REFRESH_SECONDS or not can_refresh):
             path = old[1]
         else:
-            if not can_refresh:
+            if not blocking:
+                if can_refresh and self.pending is None and time.monotonic() >= self.retry_after.get(key, 0):
+                    self.pending = (key, self.executor.submit(self.process_preview, api, dict(document), context, dict(element), blurred))
+                if old:
+                    path = old[1]
+                else:
+                    self.clear()
+                    return 'onshape_logo'
+                # A cached image remains usable while its refresh runs in the background.
+                can_refresh = False
+            if not blocking:
+                raw = None
+            elif not can_refresh:
                 with self.lock:
                     self.images.clear()
                 return 'onshape_logo'
-            try:
-                raw = fetch_snapshot(api, document, context, element)
-            except BudgetExhausted:
-                return self.hostname + old[1] if old and self.hostname else 'onshape_logo'
+            else:
+                try:
+                    raw = fetch_snapshot(api, document, context, element)
+                except BudgetExhausted:
+                    return self.hostname + old[1] if old and self.hostname else 'onshape_logo'
+            if raw is None:
+                return self.status_url(document, element, blurred, path)
             if not raw.startswith(b'\x89PNG\r\n\x1a\n'):
                 self.clear()
                 return 'onshape_logo'
@@ -226,6 +275,9 @@ class SnapshotBridge:
             cache_file.parent.mkdir(exist_ok=True)
             cache_file.write_bytes(data)
             self.last_fetch[key] = (time.monotonic(), path)
+        return self.status_url(document, element, blurred, path)
+
+    def status_url(self, document, element, blurred, path):
         if not self.hostname:
             return 'onshape_logo'
         url = self.hostname + path
@@ -239,6 +291,7 @@ class SnapshotBridge:
         return url
 
     def close(self):
+        self.executor.shutdown(wait=False, cancel_futures=True)
         if self.process and self.process.poll() is None:
             self.process.terminate()
         self.server.shutdown()

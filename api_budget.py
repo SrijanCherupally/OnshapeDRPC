@@ -2,6 +2,16 @@
 import json
 from pathlib import Path
 import time
+import threading
+from functools import wraps
+
+
+def synchronized(method):
+    @wraps(method)
+    def call(self, *args, **kwargs):
+        with self.lock:
+            return method(self, *args, **kwargs)
+    return call
 
 
 class BudgetExhausted(RuntimeError):
@@ -14,6 +24,7 @@ class ApiBudget:
     STARTING_CREDIT = 10
 
     def __init__(self, path):
+        self.lock = threading.RLock()
         self.path = Path(path)
         self.last_tick = time.monotonic()
         self.last_save = self.last_tick
@@ -27,6 +38,7 @@ class ApiBudget:
             # A broken budget file must not replenish the allowance.
             self.credit, self.used, self.active_seconds = 0, self.TOTAL_LIMIT, 0
 
+    @synchronized
     def save(self):
         temporary = self.path.with_suffix('.tmp')
         temporary.write_text(json.dumps({'credit': self.credit, 'used': self.used,
@@ -35,6 +47,7 @@ class ApiBudget:
         temporary.replace(self.path)
         self.last_save = time.monotonic()
 
+    @synchronized
     def tick(self, active, now=None):
         now = time.monotonic() if now is None else now
         # Do not earn a large burst when Windows resumes from sleep.
@@ -47,9 +60,11 @@ class ApiBudget:
         self.active = active
         self.last_tick = now
 
+    @synchronized
     def available(self, calls=1):
         return self.credit + 1e-8 >= calls and self.used + calls <= self.TOTAL_LIMIT
 
+    @synchronized
     def consume(self):
         if not self.available():
             raise BudgetExhausted('Onshape API budget is exhausted; using cached presence.')

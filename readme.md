@@ -16,7 +16,7 @@ Document: Robot Design
 - Reads the selected Onshape page URL through Windows accessibility, including installed Onshape browser apps. Duplicate tab names and non-default workspaces are resolved using their IDs.
 - Uses the Onshape logo and provides a **View in Onshape** button; document access is enforced by Onshape.
 - Always blurs Biobuzz; other documents show clear previews by default. Add more protected documents by name or ID.
-- Checks for tab changes every 2 seconds and refreshes previews about every 30 minutes when budget allows.
+- Checks for tab changes every half-second, submits changed activity at least 5 seconds apart, and refreshes each preview about once an hour when budget allows.
 - Runs silently, starts at Windows login, reconnects when Discord becomes available, and prevents duplicate instances.
 - Keeps rotating local diagnostic logs instead of requiring a console window.
 
@@ -66,7 +66,7 @@ Remove-Variable taskAccessKey, taskSecretInput, taskSecretKey, taskEncoded
 powershell -NoProfile -ExecutionPolicy Bypass -File .\start.ps1
 ```
 
-Open Discord and an Onshape document. The selected tab should appear on your Discord profile after a 2-second check plus render and Discord delivery time.
+Open Discord and an Onshape document. The selected tab should appear on your Discord profile after a local check and the next activity submission. Changed submissions are at least 5 seconds apart; Discord delivery can add latency. Image rendering runs in the background and does not hold up tab labels.
 
 ### Start automatically at login
 
@@ -82,9 +82,9 @@ To disable automatic startup, open `shell:startup` using Win + R and delete `Ons
 
 Discord cannot enforce Onshape document permissions for Rich Presence images. This app displays previews publicly, using blur rules for protected documents, while the **View in Onshape** button opens the full model with Onshape's normal sign-in and document access checks.
 
-For Assemblies and Part Studios, the app reads the model bounding box and requests a fresh 300 x 300 isometric shaded render. The camera is centered on the model and its scale is chosen to include every projected bounding-box corner, preventing the clipping present in some cached Onshape thumbnails. Other tab types, or unavailable render APIs, use a 300 x 170 generated thumbnail as a fallback.
+For Assemblies and Part Studios, the app reads the model bounding box and requests a fresh 600 x 600 isometric shaded render. The camera is centered on the model and its scale is chosen to include every projected bounding-box corner, preventing the clipping present in some cached Onshape thumbnails. Other tab types, or unavailable render APIs, use a 300 x 170 generated thumbnail as a fallback.
 
-Pillow removes unused transparent background and fits all visible geometry proportionally into the square Discord preview, with a small border to keep the blurred edges inside the image. Only empty background is cropped. The blur stays at 64 x 64 detail reduction and an 8-pixel Gaussian blur on a 300 x 300 canvas. This obscures small details while retaining the general shape. Original image metadata is discarded.
+Pillow removes unused transparent background and fits all visible geometry proportionally into the square Discord preview, with a small border to keep the blurred edges inside the image. Only empty background is cropped. Clear previews retain a 600 x 600 canvas with the same proportional fit and border. The blur stays at 64 x 64 detail reduction and an 8-pixel Gaussian blur on a 300 x 300 canvas. This obscures small details while retaining the general shape. Original image metadata is discarded.
 
 Only the processed PNG permitted by the document rules is placed in the image server's memory. Biobuzz and other protected documents are always blurred before sharing. Other documents are shared as clear, fitted previews. If processing fails, the app uses the logo; protected documents never fall back to clear images.
 
@@ -92,7 +92,7 @@ A local server on 127.0.0.1:19288 serves the processed preview at an unpredictab
 
 **Every shared preview, clear or blurred, is accessible to anyone with its URL and is processed by Cloudflare and Discord. Blurring is a visual treatment, not an access-control guarantee.** Document and tab names are also visible to anyone who can view your Discord activity. People may still recognize the model's silhouette. Existing unblurred images from earlier revisions may remain in Discord caches; the app cannot revoke cached copies.
 
-Snapshots are isometric API renders or fallback thumbnails rather than captures of your exact viewport. They change when you switch elements and are checked about every 30 minutes when budget allows. Some element types have no suitable thumbnail. The logo is used if a thumbnail or tunnel is unavailable. Old paths are removed when the current preview changes or no visible Onshape window is found.
+Snapshots are isometric API renders or fallback thumbnails rather than captures of your exact viewport. They change when you switch elements and are checked about every 60 minutes when budget allows. Some element types have no suitable thumbnail. The logo is used if a thumbnail or tunnel is unavailable. Old paths are removed when the current preview changes or no visible Onshape window is found.
 
 Quick Tunnels need no Cloudflare account, but are intended for testing and development and have no uptime guarantee. Their hostname changes at app restart; the presence updates automatically. The helper launches silently at login and retries after exiting. This integration remains experimental.
 
@@ -111,7 +111,7 @@ Edit `snapshot-settings.json` to add protected names or IDs:
 
 Use `snapshot-settings.local.json` with the same fields for personal rules that should not be committed to Git. Local rules add to the shared rules; they cannot remove protections. New installations can add the Biobuzz document ID from its Onshape URL to protect it after renaming. The built-in Biobuzz name rule cannot be accidentally disabled by deleting the example settings entry.
 
-Other documents show clear previews. Settings are re-read on each presence update, normally within 2 seconds. Changing a rule replaces the cached image immediately, and the old image path stops being served. Invalid settings make all previews blurred until fixed. Previously cached Discord images cannot be revoked.
+Other documents show clear previews. Settings are re-read on each presence update, normally within half a second. Changing a rule removes the old image path immediately. The new permitted preview is loaded from cache or rendered in the background; the logo is used while a new preview is unavailable. Invalid settings make all previews blurred until fixed. Previously cached Discord images cannot be revoked.
 
 ## Troubleshooting
 
@@ -135,25 +135,27 @@ Do not run this alongside an existing background instance. `presence.log` rotate
 
 ## Low-Usage Mode: 400 Hours per Year
 
-The app checks local browser tabs every 2 seconds and reads an unchanged window URL every 6 seconds. These local checks do not use the Onshape API. Discord submissions remain at least 15 seconds apart, and rendering/delivery adds latency.
+The app checks local browser tabs every half-second and reads an unchanged window URL every second. A persistent accessibility helper avoids repeatedly starting PowerShell. These local checks do not use the Onshape API. Changed Discord submissions are at least 5 seconds apart; Discord delivery can add latency. Background image requests never hold up tab labels, though uncached document metadata can require an API request.
 
 The app targets five API calls per active hour. API credit accrues only while the app observes a visible Onshape document window. Ten initial calls allow first-time setup, and no more than ten unused credits can be held. Every outgoing API request, including failed attempts and fallback thumbnail requests, consumes credit. A persistent hard cap stops requests after 2,000 attempts. Restarting the app does not reset credit or the cap, and resuming Windows from sleep does not award a large burst of credit.
 
 This targets roughly 2,000 calls across 400 active hours, instead of hundreds of calls per hour. The hard cap also limits bursts or unusual tab-switching patterns. For [Free, EDU Student, and Standard accounts, Onshape currently lists 2,500 calls annually](https://onshape-public.github.io/docs/auth/limits/), leaving approximately 500 for other integrations **if at least 2,500 calls remain at setup**. Calls consumed before this change are still part of your current allowance; the app cannot refund them or read the account's remaining quota from its local counter.
 
-Metadata is cached for a day and saved in metadata-cache.json. Processed previews are saved under preview-cache/ and normally refreshed every 30 minutes. Returning to a saved tab or restarting reuses its preview without additional requests. Biobuzz remains blurred, including saved previews.
+Metadata is cached for a day and saved in metadata-cache.json. Processed previews are saved under preview-cache/ and normally refreshed every 60 minutes. Returning to a saved tab or restarting reuses its preview without additional requests. Biobuzz remains blurred, including saved previews.
 
 When credit is exhausted, known tab types and old images remain available. A newly visited tab can show a generic Tab label or the Onshape logo until credit is available. Browser document/tab names and exact links still come from the local window URL. Invalid budget state disables API requests rather than refilling credit.
 
 The budget is tracked in api-budget.json, excluded from Git along with the metadata and previews. Its used counter counts this app's attempts from the time low-usage mode was installed; it is not your Onshape account usage counter. The 2,000-call cap does not reset automatically because Onshape's allowance cycle may differ from the calendar year. Once your account allowance renews, stop the app, archive api-budget.json, and restart to start a new app budget. Do not reset it during the current allowance period.
 
-Lower-resolution renders use 300 x 300 pixels instead of 600 x 600: 75% fewer source pixels. This reduces image data and rendering work, but does not reduce the number of API calls. Local CPU stays low. Reading a URL used approximately 0.35 CPU-seconds on the development PC; cached title checks averaged 0.17 milliseconds. Render requests and network transfers are now much less frequent.
+Renders use 600 x 600 source pixels, and clear previews retain that resolution. Biobuzz keeps the existing blur strength and 300 x 300 processed canvas. Resolution changes affect rendering work and transferred bytes, not API call counts. Each successful Assembly or Part Studio refresh normally uses two calls (bounds plus render). Hourly refreshes therefore use roughly 800 calls over 400 hours of a single continuously viewed tab, plus metadata and any fallback requests. First visits to additional tabs can need previews sooner; the five-call hourly credit rate and 2,000-call hard cap still apply.
+
+On the development PC, the first local URL read took about 0.38 seconds, and subsequent reads with the persistent helper took about 0.02–0.04 seconds. Timing depends on browser accessibility and document size.
 
 ## Development
 
 ```powershell
 .\venv\Scripts\python.exe -m unittest discover -s tests -v
-.\venv\Scripts\python.exe -m py_compile main.py snapshot_bridge.py api_budget.py
+.\venv\Scripts\python.exe -m py_compile main.py active_url.py snapshot_bridge.py api_budget.py
 ```
 
 The local instance guard uses port 19287; the image server uses port 19288. snapshot-status.json contains the current preview URL and blur state and is ignored by Git. API calls have timeouts; metadata and processed previews are saved locally across restarts.

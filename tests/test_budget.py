@@ -2,10 +2,26 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
+from concurrent.futures import ThreadPoolExecutor
 from api_budget import ApiBudget, BudgetExhausted
 
 
 class BudgetTests(unittest.TestCase):
+    def test_background_and_foreground_share_one_atomic_budget(self):
+        with tempfile.TemporaryDirectory() as directory:
+            budget = ApiBudget(Path(directory) / 'budget.json')
+            def attempt(_):
+                try:
+                    budget.consume()
+                    return True
+                except BudgetExhausted:
+                    return False
+            with ThreadPoolExecutor(max_workers=8) as workers:
+                self.assertEqual(sum(workers.map(attempt, range(40))), 10)
+            restored = ApiBudget(budget.path)
+            self.assertEqual(restored.used, 10)
+            self.assertEqual(restored.credit, 0)
+
     def test_credit_survives_restart_and_only_grows_during_active_use(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'budget.json'

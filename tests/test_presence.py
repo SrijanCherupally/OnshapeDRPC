@@ -4,6 +4,7 @@ from unittest.mock import patch
 from io import BytesIO
 import tempfile
 import itertools
+import threading
 from pathlib import Path
 import requests
 from PIL import Image, ImageDraw
@@ -116,13 +117,13 @@ class PresenceTests(unittest.TestCase):
     def test_render_fits_all_corners_for_model_far_from_origin(self):
         bounds = {'lowX': 100, 'highX': 104, 'lowY': -80, 'highY': -70, 'lowZ': 20, 'highZ': 35}
         params = render_parameters(bounds)
-        self.assertEqual(params['outputWidth'], 300)
-        self.assertEqual(params['outputHeight'], 300)
+        self.assertEqual(params['outputWidth'], 600)
+        self.assertEqual(params['outputHeight'], 600)
         matrix = [float(v) for v in params['viewMatrix'].split(',')]
         for corner in itertools.product(*[(bounds['low'+a], bounds['high'+a]) for a in 'XYZ']):
             for offset in [0, 4]:
                 projected = sum(matrix[offset+i] * corner[i] for i in range(3)) + matrix[offset+3]
-                self.assertLessEqual(abs(projected) / params['pixelSize'], 134.00001)
+                self.assertLessEqual(abs(projected) / params['pixelSize'], 284.00001)
 
     def test_biobuzz_is_always_blurred_and_other_documents_are_clear(self):
         with tempfile.TemporaryDirectory() as directory, patch('snapshot_bridge.ROOT', Path(directory)):
@@ -160,9 +161,8 @@ class PresenceTests(unittest.TestCase):
 
     def test_url_lookup_is_cached_but_refreshes_for_changed_title(self):
         main._tab_cache = None
-        result = Mock(stdout='')
         try:
-            with patch('main.subprocess.run', return_value=result) as run, patch('main.time.monotonic', side_effect=[0, 2, 4, 6]):
+            with patch('main.read_onshape_url', return_value='') as run, patch('main.time.monotonic', side_effect=[0, .5, .6, .9]):
                 main.cached_tab(1, 'Onshape - Robot | Intake', ('Robot', 'Intake'))
                 main.cached_tab(1, 'Onshape - Robot | Intake', ('Robot', 'Intake'))
                 self.assertEqual(run.call_count, 1)
@@ -170,11 +170,45 @@ class PresenceTests(unittest.TestCase):
                 self.assertEqual(run.call_count, 2)
                 main.cached_tab(1, 'Onshape - Robot | Shooter', ('Robot', 'Shooter'))
                 self.assertEqual(run.call_count, 2)
-            with patch('main.subprocess.run', return_value=result) as run, patch('main.time.monotonic', return_value=11):
+            with patch('main.read_onshape_url', return_value='') as run, patch('main.time.monotonic', return_value=2):
                 main.cached_tab(1, 'Onshape - Robot | Shooter', ('Robot', 'Shooter'))
                 self.assertEqual(run.call_count, 1)
         finally:
             main._tab_cache = None
+
+    def test_background_render_does_not_block_or_serve_previous_tab(self):
+        raw = BytesIO()
+        Image.new('RGB', (600, 200), 'red').save(raw, 'PNG')
+        release = threading.Event()
+        def fetch(*args):
+            release.wait(3)
+            return raw.getvalue()
+        bridge = SnapshotBridge(port=0)
+        bridge.ensure_tunnel = Mock()
+        bridge.hostname = 'http://127.0.0.1:' + str(bridge.server.server_port)
+        api = Mock()
+        doc = {'id': 'doc', 'name': 'Robot'}
+        first = {'id': 'first', 'name': 'First', 'elementType': 'ASSEMBLY'}
+        second = {'id': 'second', 'name': 'Second', 'elementType': 'PARTSTUDIO'}
+        try:
+            with tempfile.TemporaryDirectory() as directory, patch('snapshot_bridge.ROOT', Path(directory)), patch('snapshot_bridge.fetch_snapshot', side_effect=fetch) as mocked:
+                self.assertEqual(bridge.publish(api, doc, 'ws', first, blocking=False), 'onshape_logo')
+                future = bridge.pending[1]
+                self.assertFalse(future.done())
+                self.assertEqual(bridge.publish(api, doc, 'ws', second, blocking=False), 'onshape_logo')
+                release.set()
+                future.result(timeout=3)
+                # Completing First while viewing Second must never publish First.
+                self.assertEqual(bridge.publish(api, doc, 'ws', second, blocking=False), 'onshape_logo')
+                bridge.pending[1].result(timeout=3)
+                url = bridge.publish(api, doc, 'ws', second, blocking=False)
+                self.assertEqual(Image.open(BytesIO(requests.get(url, timeout=3).content)).size, (600, 600))
+                self.assertEqual(mocked.call_count, 2)
+                bridge.publish(api, doc, 'ws', second, blocking=False)
+                self.assertEqual(mocked.call_count, 2)
+        finally:
+            release.set()
+            bridge.close()
 
     def test_saved_preview_survives_restart_without_api_calls(self):
         source = Image.new('RGB', (300, 300), 'red')

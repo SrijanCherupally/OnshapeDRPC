@@ -15,15 +15,17 @@ from dotenv import load_dotenv
 from pypresence import Presence
 from snapshot_bridge import SnapshotBridge
 from api_budget import ApiBudget, BudgetExhausted
+from active_url import UrlReader
 
 ROOT = Path(__file__).resolve().parent
 load_dotenv(ROOT / '.env')
 BASE_URL = 'https://cad.onshape.com/api'
 CLIENT_ID = '1250116187732578354'
-POLL_SECONDS = 2
-URL_REFRESH_SECONDS = 6
-PRESENCE_MIN_SECONDS = 15
+POLL_SECONDS = 0.5
+URL_REFRESH_SECONDS = 1
+PRESENCE_MIN_SECONDS = 5
 _tab_cache = None
+_url_reader = None
 LABELS = {'PARTSTUDIO': 'Part Studio', 'ASSEMBLY': 'Assembly', 'DRAWING': 'Drawing',
           'VARIABLESTUDIO': 'Variable Studio', 'BILLOFMATERIALS': 'Bill of Materials', 'BLOB': 'Imported File'}
 log = logging.getLogger('onshape_presence')
@@ -35,6 +37,13 @@ def parse_title(title):
     return (match.group(1).strip(), match.group(2).strip()) if match else None
 
 
+def read_onshape_url(title):
+    global _url_reader
+    if _url_reader is None:
+        _url_reader = UrlReader()
+    return _url_reader.read(title)
+
+
 def cached_tab(hwnd, title, tab):
     global _tab_cache
     now = time.monotonic()
@@ -43,12 +52,7 @@ def cached_tab(hwnd, title, tab):
         return _tab_cache[2]
     resolved = tab
     try:
-        result = subprocess.run(
-            ['powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
-             '-File', str(ROOT / 'active-url.ps1'), '-WindowTitle', title],
-            capture_output=True, text=True, timeout=8,
-            creationflags=subprocess.CREATE_NO_WINDOW)
-        url = result.stdout.strip()
+        url = read_onshape_url(title)
         match = re.fullmatch(r'https://cad\.onshape\.com/documents/([a-f0-9]{24})/([wvm])/([a-f0-9]{24})/e/([a-f0-9]{24})(?:[?#].*)?', url)
         if match:
             resolved = (*tab, match.groups())
@@ -248,7 +252,7 @@ def run():
                 started = int(time.time())
                 current = identity
             payload = make_presence(document, element, element['name'] if element else tab[1], started, wid)
-            payload['large_image'] = bridge.publish(api, document, wid, element)
+            payload['large_image'] = bridge.publish(api, document, wid, element, blocking=False)
             if payload != last_payload and time.monotonic() - last_sent >= PRESENCE_MIN_SECONDS:
                 reply = rpc.update(**payload)
                 accepted = reply.get('data') or {}
