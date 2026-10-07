@@ -1,3 +1,4 @@
 pypresence==4.6.2
 requests==2.34.2
 python-dotenv==1.2.4
+Pillow==12.3.0

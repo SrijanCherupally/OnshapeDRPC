@@ -12,6 +12,7 @@ import time
 import requests
 from dotenv import load_dotenv
 from pypresence import Presence
+from snapshot_bridge import SnapshotBridge
 
 ROOT = Path(__file__).resolve().parent
 load_dotenv(ROOT / '.env')
@@ -159,6 +160,7 @@ def run():
     except OSError:
         return
     api = Onshape()
+    bridge = SnapshotBridge()
     rpc = None
     current = None
     started = int(time.time())
@@ -181,6 +183,7 @@ def run():
             tab = open_onshape_tab()
             resolved = api.resolve(tab) if tab else None
             if not resolved:
+                bridge.clear()
                 if last_payload is not None:
                     rpc.clear()
                     last_payload = None
@@ -193,6 +196,7 @@ def run():
                 started = int(time.time())
                 current = identity
             payload = make_presence(document, element, element['name'] if element else tab[1], started, wid)
+            payload['large_image'] = bridge.publish(api, document, wid, element)
             if payload != last_payload:
                 reply = rpc.update(**payload)
                 accepted = reply.get('data') or {}
