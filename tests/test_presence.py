@@ -116,11 +116,13 @@ class PresenceTests(unittest.TestCase):
     def test_render_fits_all_corners_for_model_far_from_origin(self):
         bounds = {'lowX': 100, 'highX': 104, 'lowY': -80, 'highY': -70, 'lowZ': 20, 'highZ': 35}
         params = render_parameters(bounds)
+        self.assertEqual(params['outputWidth'], 300)
+        self.assertEqual(params['outputHeight'], 300)
         matrix = [float(v) for v in params['viewMatrix'].split(',')]
         for corner in itertools.product(*[(bounds['low'+a], bounds['high'+a]) for a in 'XYZ']):
             for offset in [0, 4]:
                 projected = sum(matrix[offset+i] * corner[i] for i in range(3)) + matrix[offset+3]
-                self.assertLessEqual(abs(projected) / params['pixelSize'], 284.00001)
+                self.assertLessEqual(abs(projected) / params['pixelSize'], 134.00001)
 
     def test_biobuzz_is_always_blurred_and_other_documents_are_clear(self):
         with tempfile.TemporaryDirectory() as directory, patch('snapshot_bridge.ROOT', Path(directory)):

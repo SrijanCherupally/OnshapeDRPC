@@ -19,6 +19,8 @@ from api_budget import BudgetExhausted
 
 ROOT = Path(__file__).resolve().parent
 SNAPSHOT_REFRESH_SECONDS = 1800
+RENDER_SIZE = 300
+RENDER_MARGIN = 16
 
 
 def should_blur(document):
@@ -59,8 +61,9 @@ def render_parameters(bounds):
             (1 / math.sqrt(3), -1 / math.sqrt(3), 1 / math.sqrt(3))]
     matrix = [value for row in rows for value in (*row, -sum(row[i] * center[i] for i in range(3)))]
     span = max(sum(abs(row[i]) * spans[i] for i in range(3)) for row in rows[:2])
-    return {'viewMatrix': ','.join(str(v) for v in matrix), 'pixelSize': max(span / 568, 1e-9),
-            'outputWidth': 600, 'outputHeight': 600}
+    return {'viewMatrix': ','.join(str(v) for v in matrix),
+            'pixelSize': max(span / (RENDER_SIZE - 2 * RENDER_MARGIN), 1e-9),
+            'outputWidth': RENDER_SIZE, 'outputHeight': RENDER_SIZE}
 
 
 def fetch_snapshot(api, document, context, element):
@@ -79,7 +82,7 @@ def fetch_snapshot(api, document, context, element):
             pass
     # Other tab types, or unavailable render APIs, use the wider thumbnail.
     response = api.request(
-        f'/thumbnails/d/{did}/{wvm}/{context}/e/{eid}/s/600x340',
+        f'/thumbnails/d/{did}/{wvm}/{context}/e/{eid}/s/300x170',
         headers={'Accept': 'image/png'}, timeout=15)
     return response.content if response.ok else b''
 

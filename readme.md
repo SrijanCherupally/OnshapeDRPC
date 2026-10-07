@@ -82,7 +82,7 @@ To disable automatic startup, open `shell:startup` using Win + R and delete `Ons
 
 Discord cannot enforce Onshape document permissions for Rich Presence images. This app displays previews publicly, using blur rules for protected documents, while the **View in Onshape** button opens the full model with Onshape's normal sign-in and document access checks.
 
-For Assemblies and Part Studios, the app reads the model bounding box and requests a fresh isometric shaded render. The camera is centered on the model and its scale is chosen to include every projected bounding-box corner, preventing the clipping present in some cached Onshape thumbnails. Other tab types, or unavailable render APIs, use a wider generated thumbnail as a fallback.
+For Assemblies and Part Studios, the app reads the model bounding box and requests a fresh 300 x 300 isometric shaded render. The camera is centered on the model and its scale is chosen to include every projected bounding-box corner, preventing the clipping present in some cached Onshape thumbnails. Other tab types, or unavailable render APIs, use a 300 x 170 generated thumbnail as a fallback.
 
 Pillow removes unused transparent background and fits all visible geometry proportionally into the square Discord preview, with a small border to keep the blurred edges inside the image. Only empty background is cropped. The blur stays at 64 x 64 detail reduction and an 8-pixel Gaussian blur on a 300 x 300 canvas. This obscures small details while retaining the general shape. Original image metadata is discarded.
 
@@ -147,7 +147,7 @@ When credit is exhausted, known tab types and old images remain available. A new
 
 The budget is tracked in api-budget.json, excluded from Git along with the metadata and previews. Its used counter counts this app's attempts from the time low-usage mode was installed; it is not your Onshape account usage counter. The 2,000-call cap does not reset automatically because Onshape's allowance cycle may differ from the calendar year. Once your account allowance renews, stop the app, archive api-budget.json, and restart to start a new app budget. Do not reset it during the current allowance period.
 
-Local CPU stays low. Reading a URL used approximately 0.35 CPU-seconds on the development PC; cached title checks averaged 0.17 milliseconds. Render requests and network transfers are now much less frequent.
+Lower-resolution renders use 300 x 300 pixels instead of 600 x 600: 75% fewer source pixels. This reduces image data and rendering work, but does not reduce the number of API calls. Local CPU stays low. Reading a URL used approximately 0.35 CPU-seconds on the development PC; cached title checks averaged 0.17 milliseconds. Render requests and network transfers are now much less frequent.
 
 ## Development
 
