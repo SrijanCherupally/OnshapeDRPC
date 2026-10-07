@@ -1,4 +1,4 @@
-"""Publish only heavily blurred model thumbnails through a temporary tunnel."""
+"""Publish model previews with per-document blur rules."""
 import atexit
 import base64
 import binascii
@@ -17,6 +17,33 @@ import requests
 from PIL import Image, ImageFilter, ImageOps
 
 ROOT = Path(__file__).resolve().parent
+
+
+def should_blur(document):
+    # Biobuzz is protected even if someone accidentally removes it from settings.
+    name = str(document.get('name', '')).strip().casefold()
+    if not name or name == 'biobuzz':
+        return True
+    names = {'biobuzz'}
+    ids = set()
+    for filename in ['snapshot-settings.json', 'snapshot-settings.local.json']:
+        path = ROOT / filename
+        if not path.exists():
+            continue
+        try:
+            settings = json.loads(path.read_text(encoding='utf-8-sig'))
+            configured_names = settings.get('blurred_document_names', [])
+            configured_ids = settings.get('blurred_document_ids', [])
+            if not isinstance(configured_names, list) or not isinstance(configured_ids, list):
+                return True
+            if not all(isinstance(v, str) for v in configured_names + configured_ids):
+                return True
+            names.update(v.strip().casefold() for v in configured_names)
+            ids.update(v.strip() for v in configured_ids)
+        except (OSError, ValueError, AttributeError):
+            # Invalid privacy settings must never silently produce clear images.
+            return True
+    return name in names or document.get('id') in ids
 
 
 def render_parameters(bounds):
@@ -55,8 +82,8 @@ def fetch_snapshot(api, document, context, element):
     return response.content if response.ok else b''
 
 
-def blur_snapshot(data):
-    """Discard fine details and original metadata before an image is exposed."""
+def prepare_snapshot(data, blurred):
+    """Fit the full model, discard metadata, and optionally obscure fine details."""
     with Image.open(BytesIO(data)) as source:
         source.load()
         rgba = source.convert('RGBA')
@@ -67,12 +94,18 @@ def blur_snapshot(data):
         fitted = ImageOps.contain(rgba.crop(visible), (276, 276), Image.Resampling.LANCZOS)
         background = Image.new('RGBA', (300, 300), (43, 45, 49, 255))
         background.alpha_composite(fitted, ((300 - fitted.width) // 2, (300 - fitted.height) // 2))
-        image = background.convert('RGB').resize((64, 64), Image.Resampling.BOX)
-        image = image.resize((300, 300), Image.Resampling.BICUBIC)
-        image = image.filter(ImageFilter.GaussianBlur(radius=8))
+        image = background.convert('RGB')
+        if blurred:
+            image = image.resize((64, 64), Image.Resampling.BOX)
+            image = image.resize((300, 300), Image.Resampling.BICUBIC)
+            image = image.filter(ImageFilter.GaussianBlur(radius=8))
         output = BytesIO()
         image.save(output, format='PNG')
         return output.getvalue()
+
+
+def blur_snapshot(data):
+    return prepare_snapshot(data, blurred=True)
 
 
 class SnapshotBridge:
@@ -144,7 +177,8 @@ class SnapshotBridge:
             self.clear()
             return 'onshape_logo'
         self.ensure_tunnel()
-        key = (document['id'], document.get('_wvm', 'w'), context, element['id'])
+        blurred = should_blur(document)
+        key = (document['id'], document.get('_wvm', 'w'), context, element['id'], blurred)
         old = self.last_fetch.get(key)
         if old and time.monotonic() - old[0] < 90:
             path = old[1]
@@ -157,13 +191,13 @@ class SnapshotBridge:
                 self.clear()
                 return 'onshape_logo'
             try:
-                data = blur_snapshot(raw)
+                data = prepare_snapshot(raw, blurred)
             except (OSError, ValueError, Image.DecompressionBombError):
                 self.clear()
                 return 'onshape_logo'
             path = f'/{self.token}/{hashlib.sha256(data).hexdigest()[:24]}.png'
             with self.lock:
-                # Only blurred bytes are stored in the publicly served image map.
+                # Store only the processed image permitted by this document's rules.
                 self.images = {path: data}
             self.last_fetch = {key: (time.monotonic(), path)}
         if not self.hostname:
@@ -171,7 +205,7 @@ class SnapshotBridge:
         url = self.hostname + path
         (ROOT / 'snapshot-status.json').write_text(json.dumps({
             'tab': element['name'], 'type': element['elementType'], 'image_url': url,
-            'blurred': True
+            'blurred': blurred, 'document': document.get('name', '')
         }), encoding='utf-8')
         return url
 

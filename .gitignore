@@ -6,4 +6,5 @@ presence.log*
 main.py.bak
 tools/cloudflared.exe
 snapshot-status.json
+snapshot-settings.local.json
 __pycache__/

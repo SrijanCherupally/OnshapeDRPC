@@ -8,7 +8,7 @@ from pathlib import Path
 import requests
 from PIL import Image, ImageDraw
 import main
-from snapshot_bridge import SnapshotBridge, blur_snapshot, render_parameters
+from snapshot_bridge import SnapshotBridge, blur_snapshot, render_parameters, prepare_snapshot, should_blur
 
 
 class PresenceTests(unittest.TestCase):
@@ -119,6 +119,40 @@ class PresenceTests(unittest.TestCase):
             for offset in [0, 4]:
                 projected = sum(matrix[offset+i] * corner[i] for i in range(3)) + matrix[offset+3]
                 self.assertLessEqual(abs(projected) / params['pixelSize'], 284.00001)
+
+    def test_biobuzz_is_always_blurred_and_other_documents_are_clear(self):
+        with tempfile.TemporaryDirectory() as directory, patch('snapshot_bridge.ROOT', Path(directory)):
+            self.assertTrue(should_blur({'id': 'protected', 'name': 'Biobuzz'}))
+            self.assertTrue(should_blur({'id': 'protected', 'name': '  BIOBUZZ  '}))
+            self.assertFalse(should_blur({'id': 'other', 'name': 'Pollen Bot'}))
+            Path(directory, 'snapshot-settings.local.json').write_text(
+                '{"blurred_document_ids": ["protected"]}')
+            self.assertTrue(should_blur({'id': 'protected', 'name': 'Renamed Robot'}))
+            Path(directory, 'snapshot-settings.json').write_text('invalid JSON')
+            self.assertTrue(should_blur({'id': 'other', 'name': 'Pollen Bot'}))
+
+    def test_document_rule_change_replaces_cached_clear_image(self):
+        source = Image.new('RGB', (300, 300), 'black')
+        ImageDraw.Draw(source).rectangle((140, 40, 160, 260), fill='white')
+        raw = BytesIO()
+        source.save(raw, 'PNG')
+        bridge = SnapshotBridge(port=0)
+        bridge.ensure_tunnel = Mock()
+        bridge.hostname = 'http://127.0.0.1:' + str(bridge.server.server_port)
+        api = Mock()
+        document = {'id': 'doc', 'name': 'Other Robot'}
+        element = {'id': 'tab', 'name': 'Intake', 'elementType': 'PARTSTUDIO'}
+        try:
+            with tempfile.TemporaryDirectory() as directory, patch('snapshot_bridge.ROOT', Path(directory)), patch('snapshot_bridge.fetch_snapshot', return_value=raw.getvalue()):
+                clear_url = bridge.publish(api, document, 'ws', element)
+                self.assertEqual(requests.get(clear_url, timeout=3).content, prepare_snapshot(raw.getvalue(), False))
+                Path(directory, 'snapshot-settings.local.json').write_text('{"blurred_document_ids": ["doc"]}')
+                blurred_url = bridge.publish(api, document, 'ws', element)
+                self.assertNotEqual(clear_url, blurred_url)
+                self.assertEqual(requests.get(clear_url, timeout=3).status_code, 404)
+                self.assertEqual(requests.get(blurred_url, timeout=3).content, blur_snapshot(raw.getvalue()))
+        finally:
+            bridge.close()
 
 
 if __name__ == '__main__':
