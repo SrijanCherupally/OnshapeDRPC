@@ -118,7 +118,9 @@ Other documents show clear previews. Settings are re-read on each presence updat
 
 The persistent local accessibility helper reads only the open `feature-dialog` panel. Its help topic identifies built-in feature types, including renamed Sketches and Extrudes; the editor title supplies the feature name. Unrecognized custom features show `Feature: <editor name>`. Toolbar tools and saved feature-list entries are never treated as active editing.
 
-When no feature editor is open in a detected Part Studio, the status is **Idle**. Here, Idle means no feature is being edited; it does not measure keyboard/mouse inactivity. If the browser does not expose enough accessibility information, the app reports **Feature Detection Unavailable**, rather than falsely claiming Idle. Feature activity is read about once a second and uses the existing 5-second minimum between changed Discord submissions.
+The last feature remains visible after its editor closes, until **15 minutes** pass without using a feature. An open editor also goes idle after 15 minutes without interaction. Local Windows input timing counts only while the selected Onshape window is in the foreground; using other applications does not reset the timer. Each Part Studio retains its own most recent feature during the current app session. Before a feature has been observed, the status is Viewing during the initial grace period. Feature activity is read about once a second and uses the existing 5-second minimum between changed Discord submissions.
+
+Assemblies show their snapshots during use and switch to the branded Idle card after 15 minutes without local interaction. Interacting with the Assembly resumes the snapshot. Idle Assemblies do not request new snapshots. The inactivity tracker uses no Onshape API calls and reads only input timestamps, not typed characters.
 
 Part Studios show a locally generated feature badge instead of a CAD snapshot. The badges use bundled native Onshape feature icons, with their original artwork fitted onto a light tile for contrast. Idle uses the Onshape logo on a dark green backdrop. Assemblies use the native Assembly icon as their small badge while retaining the model snapshot. Only the feature type is drawn in the badge; the editor name appears alongside the Part Studio name and in image hover text. The document always has its own line underneath. Default names such as Extrude 72 are shown once, without a repeated Extrude prefix. Icon source URLs are recorded in assets/onshape-icons/sources.json; unknown custom features use Onshape branding. Badges use the same tunnel as Assembly previews and require no Onshape API requests. Feature names are visible to people who can see your Discord activity. Assemblies keep their fitted previews and existing blur rules.
 
@@ -164,7 +166,7 @@ On the development PC, the first local URL read took about 0.38 seconds, and sub
 
 ```powershell
 .\venv\Scripts\python.exe -m unittest discover -s tests -v
-.\venv\Scripts\python.exe -m py_compile main.py active_url.py feature_activity.py feature_badge.py snapshot_bridge.py api_budget.py
+.\venv\Scripts\python.exe -m py_compile main.py active_url.py activity_tracker.py feature_activity.py feature_badge.py snapshot_bridge.py api_budget.py
 ```
 
 The local instance guard uses port 19287; the image server uses port 19288. snapshot-status.json contains the current preview URL and blur state and is ignored by Git. API calls have timeouts; metadata and processed previews are saved locally across restarts.

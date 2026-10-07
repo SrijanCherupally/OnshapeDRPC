@@ -17,6 +17,7 @@ from snapshot_bridge import SnapshotBridge
 from api_budget import ApiBudget, BudgetExhausted
 from active_url import UrlReader
 from feature_activity import feature_activity
+from activity_tracker import ActivityTracker, local_input_sample
 
 ROOT = Path(__file__).resolve().parent
 load_dotenv(ROOT / '.env')
@@ -28,6 +29,7 @@ PRESENCE_MIN_SECONDS = 5
 _tab_cache = None
 _url_reader = None
 _browser_state = {}
+_onshape_hwnd = None
 LABELS = {'PARTSTUDIO': 'Part Studio', 'ASSEMBLY': 'Assembly', 'DRAWING': 'Drawing',
           'VARIABLESTUDIO': 'Variable Studio', 'BILLOFMATERIALS': 'Bill of Materials', 'BLOB': 'Imported File'}
 log = logging.getLogger('onshape_presence')
@@ -66,6 +68,7 @@ def cached_tab(hwnd, title, tab):
 
 
 def open_onshape_tab():
+    global _onshape_hwnd
     user32 = ctypes.WinDLL('user32', use_last_error=True)
     kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
     kernel32.OpenProcess.restype = wintypes.HANDLE
@@ -103,7 +106,9 @@ def open_onshape_tab():
         return not found
     user32.EnumWindows(visit, 0)
     if not found:
+        _onshape_hwnd = None
         return None
+    _onshape_hwnd = found[0][0]
     return cached_tab(*found[0])
 
 
@@ -201,7 +206,7 @@ def make_presence(document, element, tab_name, start, context=None, activity=Non
     payload = dict(name='Onshape', details=details[:128], state=f"Document: {document['name']}"[:128],
                    start=start, large_image='onshape_logo', large_text=details[:128],
                    small_image='onshape_logo', small_text='Onshape')
-    if element and element.get('elementType') == 'PARTSTUDIO':
+    if element and (element.get('elementType') == 'PARTSTUDIO' or element.get('elementType') == 'ASSEMBLY' and activity and activity['label'] == 'Idle'):
         activity = activity or {'label': 'Unavailable', 'name': ''}
         label = activity['label']
         text = 'Feature Detection Unavailable' if label == 'Unavailable' else label
@@ -227,6 +232,7 @@ def run():
         return
     api = Onshape()
     bridge = SnapshotBridge()
+    tracker = ActivityTracker()
     rpc = None
     current = None
     started = int(time.time())
@@ -267,19 +273,21 @@ def run():
             if identity != current:
                 started = int(time.time())
                 current = identity
-            activity = feature_activity(_browser_state)
+            kind = element.get('elementType') if element else 'UNKNOWN'
+            activity = tracker.update(identity, kind, feature_activity(_browser_state), local_input_sample(_onshape_hwnd))
             payload = make_presence(document, element, element['name'] if element else tab[1], started, wid, activity)
-            if element and element.get('elementType') == 'PARTSTUDIO':
+            use_badge = kind == 'PARTSTUDIO' or kind == 'ASSEMBLY' and activity['label'] == 'Idle'
+            if use_badge:
                 payload['large_image'] = bridge.publish_feature(document, element, activity)
             else:
                 payload['large_image'] = bridge.publish(api, document, wid, element, blocking=False)
-                if element and element.get('elementType') == 'ASSEMBLY':
-                    payload['small_image'] = bridge.publish_symbol('Assembly')
-                    payload['small_text'] = 'Assembly'
+            if kind == 'ASSEMBLY':
+                payload['small_image'] = bridge.publish_symbol('Assembly')
+                payload['small_text'] = 'Assembly'
             if payload != last_payload and time.monotonic() - last_sent >= PRESENCE_MIN_SECONDS:
                 reply = rpc.update(**payload)
                 accepted = reply.get('data') or {}
-                image_kind = ('feature' if element and element.get('elementType') == 'PARTSTUDIO' else 'snapshot') if payload['large_image'].startswith('https://') else 'logo'
+                image_kind = ('feature' if use_badge else 'snapshot') if payload['large_image'].startswith('https://') else 'logo'
                 log.info('Presence accepted: name=%s, %s / %s, image=%s',
                          accepted.get('name', payload['name']), payload['details'], payload['state'],
                          image_kind)
