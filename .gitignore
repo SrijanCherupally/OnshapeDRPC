@@ -2,3 +2,8 @@
 /venv
 /dist
 /build
+presence.log*
+main.py.bak
+tools/cloudflared.exe
+snapshot-status.json
+__pycache__/

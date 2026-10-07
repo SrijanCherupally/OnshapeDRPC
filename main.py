@@ -1,90 +1,217 @@
+"""Silent Onshape presence for the selected tab of the foremost Onshape window."""
+import ctypes
+from ctypes import wintypes
+import logging
+from logging.handlers import RotatingFileHandler
 import os
-import requests
-from pypresence import Presence
+from pathlib import Path
+import re
+import socket
+import subprocess
 import time
+import requests
 from dotenv import load_dotenv
+from pypresence import Presence
+from snapshot_bridge import SnapshotBridge
 
-# Load environment variables from .env file
-load_dotenv()
-
-# Get the API key from environment variables or prompt the user
-API_KEY = os.getenv('API_KEY')
-if not API_KEY:
-    API_KEY = input("Please enter your API key: ")
-
-# Base URL for Onshape API
+ROOT = Path(__file__).resolve().parent
+load_dotenv(ROOT / '.env')
 BASE_URL = 'https://cad.onshape.com/api'
+CLIENT_ID = '1250116187732578354'
+LABELS = {'PARTSTUDIO': 'Part Studio', 'ASSEMBLY': 'Assembly', 'DRAWING': 'Drawing',
+          'VARIABLESTUDIO': 'Variable Studio', 'BILLOFMATERIALS': 'Bill of Materials', 'BLOB': 'Imported File'}
+log = logging.getLogger('onshape_presence')
 
-# Discord client ID
-DISCORD_CLIENT_ID = '1250116187732578354'
 
-# Function to get headers with authentication
-def get_headers():
-    return {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'Authorization': f'Basic {API_KEY}'
-    }
+def parse_title(title):
+    title = re.sub(r'\s[-–—]\s(?:Brave|Google Chrome|Microsoft Edge|Mozilla Firefox)(?:.*)?$', '', title)
+    match = re.fullmatch(r'Onshape\s[-–—]\s(.+?)\s\|\s(.+)', title)
+    return (match.group(1).strip(), match.group(2).strip()) if match else None
 
-# Function to get user information
-def get_user_info():
-    url = f'{BASE_URL}/users/session'
-    response = requests.get(url, headers=get_headers())
-    response.raise_for_status()  # Raise an error for bad status codes
-    return response.json()
 
-# Function to get all documents
-def get_all_documents():
-    url = f'{BASE_URL}/documents'
-    response = requests.get(url, headers=get_headers())
-    response.raise_for_status()  # Raise an error for bad status codes
-    return response.json()
-
-# Function to find the most recently modified document
-def find_active_document(documents):
-    if 'items' not in documents:
+def open_onshape_tab():
+    user32 = ctypes.WinDLL('user32', use_last_error=True)
+    kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel32.QueryFullProcessImageNameW.argtypes = [wintypes.HANDLE, wintypes.DWORD, wintypes.LPWSTR, ctypes.POINTER(wintypes.DWORD)]
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    callback_type = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    user32.EnumWindows.argtypes = [callback_type, wintypes.LPARAM]
+    user32.IsWindowVisible.argtypes = [wintypes.HWND]
+    user32.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+    user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+    found = []
+    @callback_type
+    def visit(hwnd, _):
+        if not user32.IsWindowVisible(hwnd):
+            return True
+        title = ctypes.create_unicode_buffer(2048)
+        user32.GetWindowTextW(hwnd, title, len(title))
+        tab = parse_title(title.value)
+        if not tab:
+            return True
+        pid = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        handle = kernel32.OpenProcess(0x1000, False, pid.value)
+        if not handle:
+            return True
+        try:
+            image = ctypes.create_unicode_buffer(32768)
+            size = wintypes.DWORD(len(image))
+            if kernel32.QueryFullProcessImageNameW(handle, 0, image, ctypes.byref(size)):
+                if Path(image.value).name.lower() in {'brave.exe', 'chrome.exe', 'msedge.exe', 'firefox.exe'}:
+                    found.append((tab, title.value))
+        finally:
+            kernel32.CloseHandle(handle)
+        return not found
+    user32.EnumWindows(visit, 0)
+    if not found:
         return None
-    
-    # Sort documents by last modified date
-    sorted_documents = sorted(documents['items'], key=lambda x: x['modifiedAt'], reverse=True)
-    return sorted_documents[0] if sorted_documents else None
-
-# Initialize Discord Rich Presence
-rpc = Presence(DISCORD_CLIENT_ID)
-rpc.connect()
-
-# Keep the presence updated
-while True:
+    tab, title = found[0]
     try:
-        user_info = get_user_info()
-        user_name = user_info["name"]
-        user_email = user_info["email"]
-        
-        all_documents = get_all_documents()
-        
-        active_document = find_active_document(all_documents)
-        if active_document:
-            document_name = active_document["name"]
-            document_id = active_document["id"]
-            last_modified = active_document["modifiedAt"]
-            
-            print(f'Active Document ID: {document_id}')
-            print(f'Name: {document_name}')
-            print(f'Last Modified: {last_modified}')
-            
-            # Update Discord Rich Presence with a button linking to the GitHub project
-            rpc.update(
-                state=f"Editing: {document_name}",
-                details=f"User: {user_name}",
-                large_image="onshape_logo",
-                large_text="Onshape CAD",
-                small_image="onshape_logo",  
-                small_text="IIRoan/OnshapeDRPC",
-                buttons=[{"label": "Onshape CAD", "url": "https://cad.onshape.com"}] 
-            )
-        else:
-            print("No active document found.")
-    except requests.exceptions.RequestException as e:
-        print(f"An error occurred: {e}")
-    
-    time.sleep(30)  # Wait for 30 seconds before the next API query
+        result = subprocess.run(
+            ['powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+             '-File', str(ROOT / 'active-url.ps1'), '-WindowTitle', title],
+            capture_output=True, text=True, timeout=8,
+            creationflags=subprocess.CREATE_NO_WINDOW)
+        url = result.stdout.strip()
+        match = re.fullmatch(r'https://cad\.onshape\.com/documents/([a-f0-9]{24})/([wvm])/([a-f0-9]{24})/e/([a-f0-9]{24})(?:[?#].*)?', url)
+        if match:
+            return (*tab, match.groups())
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    return tab
+
+
+class Onshape:
+    def __init__(self):
+        key = os.getenv('API_KEY')
+        if not key:
+            raise RuntimeError('API_KEY is missing from the project .env file.')
+        self.session = requests.Session()
+        self.session.headers.update({'Authorization': f'Basic {key}', 'Accept': 'application/json'})
+        self.cache = {}
+
+    def get(self, path, params=None):
+        response = self.session.get(BASE_URL + path, params=params, timeout=15)
+        response.raise_for_status()
+        return response.json()
+
+    def cached(self, key, fetch, seconds=60):
+        previous = self.cache.get(key)
+        if previous and time.monotonic() - previous[0] < seconds:
+            return previous[1]
+        value = fetch()
+        self.cache[key] = (time.monotonic(), value)
+        return value
+
+    def documents(self, name):
+        items = []
+        offset = 0
+        while True:
+            page = self.get('/documents', {'limit': 20, 'offset': offset, 'q': name})
+            batch = page.get('items', [])
+            items.extend(batch)
+            if not page.get('next') or not batch:
+                return items
+            offset += len(batch)
+
+    def resolve(self, tab):
+        if len(tab) == 3:
+            did, wvm, wid, eid = tab[2]
+            document = dict(self.cached(('document', did), lambda: self.get(f'/documents/{did}')))
+            document['_wvm'] = wvm
+            elements = self.cached(('elements', did, wvm, wid), lambda: self.get(f'/documents/d/{did}/{wvm}/{wid}/elements'))
+            element = next((e for e in elements if e.get('id') == eid), None)
+            return document, wid, element
+        documents = self.cached(('documents', tab[0]), lambda: self.documents(tab[0]))
+        matches = [d for d in documents if d.get('name') == tab[0]]
+        if len(matches) != 1:
+            return None
+        document = matches[0]
+        did = document['id']
+        wid = (document.get('defaultWorkspace') or {}).get('id')
+        if not wid:
+            return None
+        elements = self.cached(('elements', did, wid), lambda: self.get(f'/documents/d/{did}/w/{wid}/elements'))
+        matches = [e for e in elements if e.get('name') == tab[1]]
+        element = matches[0] if len(matches) == 1 else None
+        return document, wid, element
+
+def make_presence(document, element, tab_name, start, image):
+    kind = LABELS.get(element.get('elementType'), 'Tab') if element else 'Tab'
+    details = f'{kind}: {tab_name}'
+    return dict(name='Onshape', details=details[:128], state=f"Document: {document['name']}"[:128],
+                start=start, large_image=image, large_text=details[:128],
+                small_image='onshape_logo', small_text='Onshape')
+
+
+def run():
+    handler = RotatingFileHandler(ROOT / 'presence.log', maxBytes=500000, backupCount=2, encoding='utf-8')
+    logging.basicConfig(level=logging.INFO, handlers=[handler], format='%(asctime)s %(levelname)s %(message)s')
+    lock = socket.socket()
+    try:
+        lock.bind(('127.0.0.1', 19287))
+    except OSError:
+        return
+    api = Onshape()
+    bridge = SnapshotBridge()
+    rpc = None
+    current = None
+    started = int(time.time())
+    last_payload = None
+    while True:
+        try:
+            if rpc is None:
+                candidate = Presence(CLIENT_ID)
+                try:
+                    candidate.connect()
+                except Exception:
+                    try:
+                        candidate.close()
+                    except Exception:
+                        pass
+                    raise
+                rpc = candidate
+                last_payload = None
+                log.info('Connected to Discord.')
+            tab = open_onshape_tab()
+            resolved = api.resolve(tab) if tab else None
+            if not resolved:
+                bridge.clear()
+                if last_payload is not None:
+                    rpc.clear()
+                    last_payload = None
+                current = None
+                time.sleep(15)
+                continue
+            document, wid, element = resolved
+            identity = (document['id'], wid, element['id'] if element else tab[1])
+            if identity != current:
+                started = int(time.time())
+                current = identity
+            payload = make_presence(document, element, element['name'] if element else tab[1], started,
+                                    bridge.publish(api, document, wid, element))
+            if payload != last_payload:
+                reply = rpc.update(**payload)
+                accepted = reply.get('data') or {}
+                log.info('Presence accepted: name=%s, %s / %s, snapshot=%s',
+                         accepted.get('name', payload['name']), payload['details'], payload['state'],
+                         payload['large_image'].startswith('https://'))
+                last_payload = payload
+        except requests.RequestException as error:
+            log.warning('Onshape request failed: %s', type(error).__name__)
+        except Exception as error:
+            log.warning('Discord/browser retry: %s', type(error).__name__)
+            if rpc:
+                try:
+                    rpc.close()
+                except Exception:
+                    pass
+            rpc = None
+        time.sleep(15)
+
+
+if __name__ == '__main__':
+    run()
