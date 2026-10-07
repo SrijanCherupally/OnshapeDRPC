@@ -95,6 +95,20 @@ class PresenceTests(unittest.TestCase):
         finally:
             bridge.close()
 
+    def test_wide_snapshot_keeps_both_ends_and_padding(self):
+        source = Image.new('RGB', (600, 200), 'red')
+        draw = ImageDraw.Draw(source)
+        draw.rectangle((0, 0, 100, 199), fill='lime')
+        draw.rectangle((500, 0, 599, 199), fill='blue')
+        data = BytesIO()
+        source.save(data, 'PNG')
+        result = Image.open(BytesIO(blur_snapshot(data.getvalue())))
+        self.assertEqual(result.size, (300, 300))
+        left, right = result.getpixel((40, 150)), result.getpixel((260, 150))
+        self.assertGreater(left[1], left[0])
+        self.assertGreater(right[2], right[0])
+        self.assertEqual(result.getpixel((150, 30)), (43, 45, 49))
+
 
 if __name__ == '__main__':
     unittest.main()

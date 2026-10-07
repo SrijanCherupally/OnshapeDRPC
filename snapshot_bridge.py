@@ -10,7 +10,7 @@ import secrets
 import subprocess
 import threading
 import time
-from PIL import Image, ImageFilter
+from PIL import Image, ImageFilter, ImageOps
 
 ROOT = Path(__file__).resolve().parent
 
@@ -20,12 +20,13 @@ def blur_snapshot(data):
     with Image.open(BytesIO(data)) as source:
         source.load()
         rgba = source.convert('RGBA')
-        background = Image.new('RGBA', rgba.size, (43, 45, 49, 255))
-        background.alpha_composite(rgba)
-        image = background.convert('RGB').resize((300, 300), Image.Resampling.LANCZOS)
-        image = image.resize((40, 40), Image.Resampling.BOX)
+        fitted = ImageOps.contain(rgba, (252, 252), Image.Resampling.LANCZOS)
+        background = Image.new('RGBA', (300, 300), (43, 45, 49, 255))
+        offset = ((300 - fitted.width) // 2, (300 - fitted.height) // 2)
+        background.alpha_composite(fitted, offset)
+        image = background.convert('RGB').resize((64, 64), Image.Resampling.BOX)
         image = image.resize((300, 300), Image.Resampling.BICUBIC)
-        image = image.filter(ImageFilter.GaussianBlur(radius=14))
+        image = image.filter(ImageFilter.GaussianBlur(radius=8))
         output = BytesIO()
         image.save(output, format='PNG')
         return output.getvalue()
@@ -107,7 +108,7 @@ class SnapshotBridge:
         else:
             did, wvm, wid, eid = key
             response = api.session.get(
-                f'https://cad.onshape.com/api/thumbnails/d/{did}/{wvm}/{wid}/e/{eid}/s/300x300',
+                f'https://cad.onshape.com/api/thumbnails/d/{did}/{wvm}/{wid}/e/{eid}/s/600x340',
                 headers={'Accept': 'image/png'}, timeout=15)
             if not response.ok or not response.content.startswith(b'\x89PNG\r\n\x1a\n'):
                 self.clear()
