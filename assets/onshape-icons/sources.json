@@ -306,5 +306,9 @@
   "Wrap": {
     "file": "wrap.png",
     "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/wrap-button@3x.png"
+  },
+  "Part Studio": {
+    "file": "part-studio.png",
+    "source": "https://cad.onshape.com/help/Content/Resources/Images/icons-master/partstudio@3x.png"
   }
 }

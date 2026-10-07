@@ -10,6 +10,7 @@ ASSETS = Path(__file__).resolve().parent / 'assets' / 'onshape-icons'
 SOURCES = json.loads((ASSETS / 'sources.json').read_text(encoding='utf-8'))
 ICONS = {re.sub(r'[^a-z0-9]', '', name.casefold()): item['file'] for name, item in SOURCES.items()}
 ICONS['sheetmetal'] = ICONS['sheetmetalmodel']
+ICONS['viewing'] = ICONS['partstudio']
 
 
 @lru_cache(maxsize=128)
@@ -36,7 +37,7 @@ def feature_badge(label, compact=False):
         icon = ImageOps.contain(icon, area, Image.Resampling.LANCZOS)
         image.alpha_composite(icon, ((300-icon.width)//2, top+(area[1]-icon.height)//2))
     if not compact:
-        caption = 'Onshape' if label == 'Unavailable' else label
+        caption = 'Part Studio' if label == 'Viewing' else 'Onshape' if label == 'Unavailable' else label
         size = 33
         font_path = None
         for path in (Path('C:/Windows/Fonts/seguisb.ttf'), Path('C:/Windows/Fonts/segoeui.ttf')):
