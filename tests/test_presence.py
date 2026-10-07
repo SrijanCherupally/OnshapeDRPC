@@ -154,6 +154,24 @@ class PresenceTests(unittest.TestCase):
         finally:
             bridge.close()
 
+    def test_url_lookup_is_cached_but_refreshes_for_changed_title(self):
+        main._tab_cache = None
+        result = Mock(stdout='')
+        try:
+            with patch('main.subprocess.run', return_value=result) as run, patch('main.time.monotonic', side_effect=[0, 2, 4, 6]):
+                main.cached_tab(1, 'Onshape - Robot | Intake', ('Robot', 'Intake'))
+                main.cached_tab(1, 'Onshape - Robot | Intake', ('Robot', 'Intake'))
+                self.assertEqual(run.call_count, 1)
+                main.cached_tab(1, 'Onshape - Robot | Shooter', ('Robot', 'Shooter'))
+                self.assertEqual(run.call_count, 2)
+                main.cached_tab(1, 'Onshape - Robot | Shooter', ('Robot', 'Shooter'))
+                self.assertEqual(run.call_count, 2)
+            with patch('main.subprocess.run', return_value=result) as run, patch('main.time.monotonic', return_value=11):
+                main.cached_tab(1, 'Onshape - Robot | Shooter', ('Robot', 'Shooter'))
+                self.assertEqual(run.call_count, 1)
+        finally:
+            main._tab_cache = None
+
 
 if __name__ == '__main__':
     unittest.main()

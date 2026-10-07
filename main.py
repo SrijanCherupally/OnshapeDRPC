@@ -18,6 +18,10 @@ ROOT = Path(__file__).resolve().parent
 load_dotenv(ROOT / '.env')
 BASE_URL = 'https://cad.onshape.com/api'
 CLIENT_ID = '1250116187732578354'
+POLL_SECONDS = 2
+URL_REFRESH_SECONDS = 6
+PRESENCE_MIN_SECONDS = 15
+_tab_cache = None
 LABELS = {'PARTSTUDIO': 'Part Studio', 'ASSEMBLY': 'Assembly', 'DRAWING': 'Drawing',
           'VARIABLESTUDIO': 'Variable Studio', 'BILLOFMATERIALS': 'Bill of Materials', 'BLOB': 'Imported File'}
 log = logging.getLogger('onshape_presence')
@@ -27,6 +31,29 @@ def parse_title(title):
     title = re.sub(r'\s[-–—]\s(?:Brave|Google Chrome|Microsoft Edge|Mozilla Firefox)(?:.*)?$', '', title)
     match = re.fullmatch(r'Onshape\s[-–—]\s(.+?)\s\|\s(.+)', title)
     return (match.group(1).strip(), match.group(2).strip()) if match else None
+
+
+def cached_tab(hwnd, title, tab):
+    global _tab_cache
+    now = time.monotonic()
+    key = (hwnd, title)
+    if _tab_cache and _tab_cache[0] == key and now - _tab_cache[1] < URL_REFRESH_SECONDS:
+        return _tab_cache[2]
+    resolved = tab
+    try:
+        result = subprocess.run(
+            ['powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+             '-File', str(ROOT / 'active-url.ps1'), '-WindowTitle', title],
+            capture_output=True, text=True, timeout=8,
+            creationflags=subprocess.CREATE_NO_WINDOW)
+        url = result.stdout.strip()
+        match = re.fullmatch(r'https://cad\.onshape\.com/documents/([a-f0-9]{24})/([wvm])/([a-f0-9]{24})/e/([a-f0-9]{24})(?:[?#].*)?', url)
+        if match:
+            resolved = (*tab, match.groups())
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    _tab_cache = (key, now, resolved)
+    return resolved
 
 
 def open_onshape_tab():
@@ -61,27 +88,14 @@ def open_onshape_tab():
             size = wintypes.DWORD(len(image))
             if kernel32.QueryFullProcessImageNameW(handle, 0, image, ctypes.byref(size)):
                 if Path(image.value).name.lower() in {'brave.exe', 'chrome.exe', 'msedge.exe', 'firefox.exe'}:
-                    found.append((tab, title.value))
+                    found.append((hwnd, title.value, tab))
         finally:
             kernel32.CloseHandle(handle)
         return not found
     user32.EnumWindows(visit, 0)
     if not found:
         return None
-    tab, title = found[0]
-    try:
-        result = subprocess.run(
-            ['powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
-             '-File', str(ROOT / 'active-url.ps1'), '-WindowTitle', title],
-            capture_output=True, text=True, timeout=8,
-            creationflags=subprocess.CREATE_NO_WINDOW)
-        url = result.stdout.strip()
-        match = re.fullmatch(r'https://cad\.onshape\.com/documents/([a-f0-9]{24})/([wvm])/([a-f0-9]{24})/e/([a-f0-9]{24})(?:[?#].*)?', url)
-        if match:
-            return (*tab, match.groups())
-    except (OSError, subprocess.TimeoutExpired):
-        pass
-    return tab
+    return cached_tab(*found[0])
 
 
 class Onshape:
@@ -165,6 +179,7 @@ def run():
     current = None
     started = int(time.time())
     last_payload = None
+    last_sent = 0
     while True:
         try:
             if rpc is None:
@@ -179,6 +194,7 @@ def run():
                     raise
                 rpc = candidate
                 last_payload = None
+                last_sent = 0
                 log.info('Connected to Discord.')
             tab = open_onshape_tab()
             resolved = api.resolve(tab) if tab else None
@@ -188,7 +204,7 @@ def run():
                     rpc.clear()
                     last_payload = None
                 current = None
-                time.sleep(15)
+                time.sleep(POLL_SECONDS)
                 continue
             document, wid, element = resolved
             identity = (document['id'], wid, element['id'] if element else tab[1])
@@ -197,15 +213,18 @@ def run():
                 current = identity
             payload = make_presence(document, element, element['name'] if element else tab[1], started, wid)
             payload['large_image'] = bridge.publish(api, document, wid, element)
-            if payload != last_payload:
+            if payload != last_payload and time.monotonic() - last_sent >= PRESENCE_MIN_SECONDS:
                 reply = rpc.update(**payload)
                 accepted = reply.get('data') or {}
                 log.info('Presence accepted: name=%s, %s / %s, snapshot=%s',
                          accepted.get('name', payload['name']), payload['details'], payload['state'],
                          payload['large_image'].startswith('https://'))
                 last_payload = payload
+                last_sent = time.monotonic()
         except requests.RequestException as error:
             log.warning('Onshape request failed: %s', type(error).__name__)
+            time.sleep(15)
+            continue
         except Exception as error:
             log.warning('Discord/browser retry: %s', type(error).__name__)
             if rpc:
@@ -214,7 +233,7 @@ def run():
                 except Exception:
                     pass
             rpc = None
-        time.sleep(15)
+        time.sleep(POLL_SECONDS if rpc is not None else 15)
 
 
 if __name__ == '__main__':

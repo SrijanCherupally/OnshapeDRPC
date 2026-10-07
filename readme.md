@@ -16,7 +16,7 @@ Document: Robot Design
 - Reads the selected Onshape page URL through Windows accessibility, including installed Onshape browser apps. Duplicate tab names and non-default workspaces are resolved using their IDs.
 - Uses the Onshape logo and provides a **View in Onshape** button; document access is enforced by Onshape.
 - Always blurs Biobuzz; other documents show clear previews by default. Add more protected documents by name or ID.
-- Updates tab selection every 15 seconds and checks previews every 90 seconds.
+- Checks for tab changes every 2 seconds and refreshes previews every 30 seconds.
 - Runs silently, starts at Windows login, reconnects when Discord becomes available, and prevents duplicate instances.
 - Keeps rotating local diagnostic logs instead of requiring a console window.
 
@@ -66,7 +66,7 @@ Remove-Variable taskAccessKey, taskSecretInput, taskSecretKey, taskEncoded
 powershell -NoProfile -ExecutionPolicy Bypass -File .\start.ps1
 ```
 
-Open Discord and an Onshape document. The selected tab should appear on your Discord profile within about 15 seconds.
+Open Discord and an Onshape document. The selected tab should appear on your Discord profile after a 2-second check plus render and Discord delivery time.
 
 ### Start automatically at login
 
@@ -92,7 +92,7 @@ A local server on 127.0.0.1:19288 serves the processed preview at an unpredictab
 
 **Every shared preview, clear or blurred, is accessible to anyone with its URL and is processed by Cloudflare and Discord. Blurring is a visual treatment, not an access-control guarantee.** Document and tab names are also visible to anyone who can view your Discord activity. People may still recognize the model's silhouette. Existing unblurred images from earlier revisions may remain in Discord caches; the app cannot revoke cached copies.
 
-Snapshots are isometric API renders or fallback thumbnails rather than captures of your exact viewport. They change when you switch elements and are checked every 90 seconds. Some element types have no suitable thumbnail. The logo is used if a thumbnail or tunnel is unavailable. Old paths are removed when the current preview changes or no visible Onshape window is found.
+Snapshots are isometric API renders or fallback thumbnails rather than captures of your exact viewport. They change when you switch elements and are checked every 30 seconds. Some element types have no suitable thumbnail. The logo is used if a thumbnail or tunnel is unavailable. Old paths are removed when the current preview changes or no visible Onshape window is found.
 
 Quick Tunnels need no Cloudflare account, but are intended for testing and development and have no uptime guarantee. Their hostname changes at app restart; the presence updates automatically. The helper launches silently at login and retries after exiting. This integration remains experimental.
 
@@ -111,7 +111,7 @@ Edit `snapshot-settings.json` to add protected names or IDs:
 
 Use `snapshot-settings.local.json` with the same fields for personal rules that should not be committed to Git. Local rules add to the shared rules; they cannot remove protections. New installations can add the Biobuzz document ID from its Onshape URL to protect it after renaming. The built-in Biobuzz name rule cannot be accidentally disabled by deleting the example settings entry.
 
-Other documents show clear previews. Settings are re-read on each presence update, normally within 15 seconds. Changing a rule replaces the cached image immediately, and the old image path stops being served. Invalid settings make all previews blurred until fixed. Previously cached Discord images cannot be revoked.
+Other documents show clear previews. Settings are re-read on each presence update, normally within 2 seconds. Changing a rule replaces the cached image immediately, and the old image path stops being served. Invalid settings make all previews blurred until fixed. Previously cached Discord images cannot be revoked.
 
 ## Troubleshooting
 
@@ -132,6 +132,18 @@ For visible debugging:
 ```
 
 Do not run this alongside an existing background instance. `presence.log` rotates at 500 KB with two backups. Logs are ignored by Git.
+
+## Update Speed and Resource Use
+
+Tab titles are checked every 2 seconds. Changing the window or title triggers a new URL read immediately; unchanged windows reuse their URL for 6 seconds. This also refreshes same-name tabs. Metadata stays cached for 60 seconds. Previews refresh every 30 seconds, and switching tabs triggers a new preview immediately.
+
+Discord receives only changed content, with at least 15 seconds between submissions. A rapid second tab switch can wait for that submission window. Rendering and Discord delivery add latency, so a 2-second check does not guarantee a 2-second visible update.
+
+On the development PC with 16 logical processors, reading the browser URL used approximately 0.35 CPU-seconds. Refreshing it every 6 seconds is estimated to add about 0.2–0.3 percentage points of total CPU use compared with the old 15-second lookup. Cached title checks averaged 0.17 milliseconds in a short benchmark. This estimates polling overhead rather than total application use.
+
+For a single visible Assembly or Part Studio, the nominal request budget is roughly 360 Onshape calls per hour: two metadata calls per minute plus two render calls every 30 seconds. The old 90-second preview schedule used about 200 calls per hour. Network delays reduce these counts; switching documents and render fallbacks can add calls. No document window means no periodic renders.
+
+[Onshape calls count toward plan-dependent annual limits](https://onshape-public.github.io/docs/auth/limits/). API quota is the main tradeoff. The intervals are defined by POLL_SECONDS and URL_REFRESH_SECONDS in main.py and SNAPSHOT_REFRESH_SECONDS in snapshot_bridge.py.
 
 ## Development
 

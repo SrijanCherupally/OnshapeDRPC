@@ -17,6 +17,7 @@ import requests
 from PIL import Image, ImageFilter, ImageOps
 
 ROOT = Path(__file__).resolve().parent
+SNAPSHOT_REFRESH_SECONDS = 30
 
 
 def should_blur(document):
@@ -117,6 +118,7 @@ class SnapshotBridge:
         self.process = None
         self.last_attempt = 0
         self.last_fetch = {}
+        self.last_status = None
         bridge = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -170,6 +172,7 @@ class SnapshotBridge:
         with self.lock:
             self.images.clear()
         self.last_fetch.clear()
+        self.last_status = None
         (ROOT / 'snapshot-status.json').unlink(missing_ok=True)
 
     def publish(self, api, document, context, element):
@@ -180,7 +183,7 @@ class SnapshotBridge:
         blurred = should_blur(document)
         key = (document['id'], document.get('_wvm', 'w'), context, element['id'], blurred)
         old = self.last_fetch.get(key)
-        if old and time.monotonic() - old[0] < 90:
+        if old and time.monotonic() - old[0] < SNAPSHOT_REFRESH_SECONDS:
             path = old[1]
         else:
             raw = fetch_snapshot(api, document, context, element)
@@ -203,10 +206,13 @@ class SnapshotBridge:
         if not self.hostname:
             return 'onshape_logo'
         url = self.hostname + path
-        (ROOT / 'snapshot-status.json').write_text(json.dumps({
+        status = json.dumps({
             'tab': element['name'], 'type': element['elementType'], 'image_url': url,
             'blurred': blurred, 'document': document.get('name', '')
-        }), encoding='utf-8')
+        })
+        if status != self.last_status:
+            (ROOT / 'snapshot-status.json').write_text(status, encoding='utf-8')
+            self.last_status = status
         return url
 
     def close(self):
