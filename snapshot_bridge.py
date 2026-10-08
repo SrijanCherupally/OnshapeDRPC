@@ -17,7 +17,7 @@ from concurrent.futures import ThreadPoolExecutor
 import requests
 from PIL import Image, ImageFilter, ImageOps
 from api_budget import BudgetExhausted
-from feature_badge import feature_badge
+from feature_badge import static_badge_url
 
 ROOT = Path(__file__).resolve().parent
 SNAPSHOT_REFRESH_SECONDS = 7200
@@ -279,17 +279,15 @@ class SnapshotBridge:
         return self.status_url(document, element, blurred, path)
 
     def publish_feature(self, document, element, activity):
-        self.ensure_tunnel()
-        data = feature_badge(activity['label'])
-        path = f'/{self.token}/feature-{hashlib.sha256(data).hexdigest()[:24]}.png'
         with self.lock:
-            self.images = {path: data}
-        return self.status_url(document, element, False, path, activity=activity)
+            self.images.clear()
+        return self.status_url(document, element, False, '', activity=activity,
+                               url=static_badge_url(activity['label']))
 
-    def status_url(self, document, element, blurred, path, activity=None):
-        if not self.hostname:
+    def status_url(self, document, element, blurred, path, activity=None, url=None):
+        if url is None and not self.hostname:
             return 'onshape_logo'
-        url = self.hostname + path
+        url = url or self.hostname + path
         status = json.dumps({
             'tab': element['name'], 'type': element['elementType'], 'image_url': url,
             'blurred': blurred, 'document': document.get('name', ''),
@@ -301,12 +299,7 @@ class SnapshotBridge:
         return url
 
     def publish_symbol(self, label):
-        self.ensure_tunnel()
-        data = feature_badge(label, compact=True)
-        path = f'/{self.token}/symbol-{hashlib.sha256(data).hexdigest()[:24]}.png'
-        with self.lock:
-            self.images[path] = data
-        return self.hostname + path if self.hostname else 'onshape_logo'
+        return static_badge_url(label, compact=True)
 
     def close(self):
         self.executor.shutdown(wait=False, cancel_futures=True)

@@ -8,7 +8,7 @@ from active_url import UrlReader
 from feature_activity import feature_activity
 from snapshot_bridge import SnapshotBridge
 from main import make_presence
-from feature_badge import SOURCES, feature_badge
+from feature_badge import SOURCES, feature_badge, static_badge_url
 from PIL import Image
 from io import BytesIO
 
@@ -65,14 +65,17 @@ class FeatureTests(unittest.TestCase):
             with tempfile.TemporaryDirectory() as directory, patch('snapshot_bridge.ROOT', Path(directory)), patch('snapshot_bridge.fetch_snapshot') as fetch:
                 self.assertEqual(bridge.publish(api, {'id': 'doc'}, 'ws', element), 'onshape_logo')
                 url = bridge.publish_feature({'id': 'doc', 'name': 'Biobuzz'}, element, {'label': 'Extrude', 'name': 'Extrude 72'})
-                self.assertEqual(requests.get(url, timeout=3).status_code, 200)
+                self.assertEqual(url, static_badge_url('Extrude'))
                 symbol = bridge.publish_symbol('Assembly')
-                self.assertEqual(requests.get(symbol, timeout=3).status_code, 200)
-                self.assertEqual(requests.get(url, timeout=3).status_code, 200)
-                self.assertEqual(requests.get(bridge.hostname + old_path, timeout=3).status_code, 404)
+                self.assertEqual(symbol, static_badge_url('Assembly', compact=True))
+                bridge.hostname = None
+                self.assertEqual(bridge.publish_feature({'id': 'doc', 'name': 'Biobuzz'}, element,
+                                 {'label': 'Viewing', 'name': ''}), static_badge_url('Viewing'))
+                bridge.ensure_tunnel.assert_not_called()
+                self.assertEqual(requests.get('http://127.0.0.1:' + str(bridge.server.server_port) + old_path, timeout=3).status_code, 404)
                 status = json.loads(Path(directory, 'snapshot-status.json').read_text())
                 self.assertFalse(status['model_snapshot'])
-                self.assertEqual(status['feature']['label'], 'Extrude')
+                self.assertEqual(status['feature']['label'], 'Viewing')
                 fetch.assert_not_called()
                 api.request.assert_not_called()
                 api.get.assert_not_called()

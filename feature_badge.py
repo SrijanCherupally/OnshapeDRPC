@@ -14,6 +14,15 @@ ICONS['viewing'] = ICONS['partstudio']
 
 
 @lru_cache(maxsize=128)
+def static_badge_url(label, compact=False):
+    manifest = json.loads((ASSETS.parent / 'presence-cards/cards.json').read_text(encoding='utf-8'))
+    key = re.sub(r'[^a-z0-9]', '', label.casefold())
+    card = manifest.get(key, manifest['feature'])
+    filename = card['compact' if compact else 'full']
+    return 'https://raw.githubusercontent.com/SrijanCherupally/OnshapeDRPC/main/assets/presence-cards/' + filename
+
+
+@lru_cache(maxsize=128)
 def feature_badge(label, compact=False):
     image = Image.new('RGBA', (300, 300), (43, 45, 49, 255))
     draw = ImageDraw.Draw(image)

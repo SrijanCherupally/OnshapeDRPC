@@ -1,0 +1,330 @@
+{
+  "3dfitspline": {
+    "compact": "d64422becf32b1d0d80918df.png",
+    "full": "03b51e5fc82b12a3644d89e1.png"
+  },
+  "assembly": {
+    "compact": "d39fb89989278b5f1bcd34ed.png",
+    "full": "7a9082a5f736c6bc9e8505af.png"
+  },
+  "bend": {
+    "compact": "19f7c53429b42d7c17a9137c.png",
+    "full": "c98eae95919afd8948e461da.png"
+  },
+  "bendrelief": {
+    "compact": "95ba54d9cd871950aef03c09.png",
+    "full": "207eee33d8179ebc43b1e64b.png"
+  },
+  "bodydraft": {
+    "compact": "7397e89ad349f50a4d24900f.png",
+    "full": "3295998fd1f3fb801cfcb63b.png"
+  },
+  "boolean": {
+    "compact": "8028efb0a0871ba3970089f6.png",
+    "full": "02667cd3adda27a8833863e9.png"
+  },
+  "boundarysurface": {
+    "compact": "ec4be818a1af79703948e730.png",
+    "full": "d2348851e303f96096f1df46.png"
+  },
+  "bridgingcurve": {
+    "compact": "3aa7f174893dd982226d9a3d.png",
+    "full": "1a49bc2bc344471e54734fc4.png"
+  },
+  "chamfer": {
+    "compact": "7153b9b4503e41dde89e1857.png",
+    "full": "5e0ee24668b46dea628ccda7.png"
+  },
+  "circularpattern": {
+    "compact": "4d1cf80cbe4ae9fd66ef9299.png",
+    "full": "2668dc7514bc4622948ec366.png"
+  },
+  "compositecurve": {
+    "compact": "34fd34c1ed2b8d3b009a9bc8.png",
+    "full": "a34316c4ebca1e145c015d9f.png"
+  },
+  "compositepart": {
+    "compact": "d65486ef9aab5435076e128c.png",
+    "full": "26355c941cf5cb732bc11426.png"
+  },
+  "constrainedsurface": {
+    "compact": "a2920759fbf3718a44f4859e.png",
+    "full": "405b8407b8dc2f6f79a2a9aa.png"
+  },
+  "corner": {
+    "compact": "07358e12a77bdaed8ce3d8b8.png",
+    "full": "957ffc3a7dbcc987f1a9f579.png"
+  },
+  "cornerbreak": {
+    "compact": "a6920890d6b1c79dce479e77.png",
+    "full": "91cd361a232d349cf6378258.png"
+  },
+  "curvepattern": {
+    "compact": "de222e387b9d231a15f762ee.png",
+    "full": "cd6a4df9732492670c391864.png"
+  },
+  "cutlist": {
+    "compact": "e58ac832c5f91f6957002a9c.png",
+    "full": "f708df04e269d4cc22960e5f.png"
+  },
+  "decal": {
+    "compact": "6475c71ff34afa6c2045f3ad.png",
+    "full": "9a14d71b6df02b5018da94fe.png"
+  },
+  "deleteface": {
+    "compact": "23ed31c0ff80732279952921.png",
+    "full": "9e3ea5e214bcc706344dd807.png"
+  },
+  "deletepart": {
+    "compact": "22631a2291ae51e3d1387178.png",
+    "full": "904e82d5460487875138708f.png"
+  },
+  "derived": {
+    "compact": "96e22a761dc55841d8825862.png",
+    "full": "08cb09214ea69b587b2e841b.png"
+  },
+  "draft": {
+    "compact": "49a27249641076effbc8b4ab.png",
+    "full": "7e79b307854042720f7e942c.png"
+  },
+  "editcurve": {
+    "compact": "a3be2498f328ae5c90e19df2.png",
+    "full": "0d6aada9255c4d6fa66dd6d0.png"
+  },
+  "enclose": {
+    "compact": "01a55f8c0a2f5a77fbae298f.png",
+    "full": "08eb9a85775537205c52252d.png"
+  },
+  "endcap": {
+    "compact": "ccf851eb8eb2f9d41d7d950b.png",
+    "full": "7b9491a51b3167cf4e1f072a.png"
+  },
+  "externalthread": {
+    "compact": "7d3b4be1158ff24644afd0c9.png",
+    "full": "ca79bf6e72c800e6186a3209.png"
+  },
+  "extrude": {
+    "compact": "e4a73ed0af6d6614c3a54594.png",
+    "full": "c0a09c9b8180ea6819a0281c.png"
+  },
+  "faceblend": {
+    "compact": "203990af598ccdcec43d4b02.png",
+    "full": "158b933def307e5f8f3464fa.png"
+  },
+  "feature": {
+    "compact": "d40d32f9b3918cc3f77335c5.png",
+    "full": "ba761f4ae099010307a6e29e.png"
+  },
+  "fill": {
+    "compact": "fc8d07a5b4f76c8fae625c36.png",
+    "full": "8b3348ea3fbacf1c78e3bcab.png"
+  },
+  "fillet": {
+    "compact": "211685f0b678b8ef629fcd41.png",
+    "full": "c75ea3fa5e6b6875751bcb29.png"
+  },
+  "finishflexpcbmodel": {
+    "compact": "04270466f1a3d4149642b194.png",
+    "full": "7dae1f550572c55cf758a4c0.png"
+  },
+  "finishsheetmetalmodel": {
+    "compact": "58d59d86ede540ad3d220227.png",
+    "full": "c2e48c442eff8ef46fe9408f.png"
+  },
+  "flange": {
+    "compact": "8e02e1df179beb6c8aba8c75.png",
+    "full": "97354c91070ff94fe30d20b6.png"
+  },
+  "flexpcbmodel": {
+    "compact": "6fab6a311431b187958c59d0.png",
+    "full": "c7a553ef0a88092be67c5ff5.png"
+  },
+  "form": {
+    "compact": "fc556baee1422e0065e25e01.png",
+    "full": "f6e6edbca246b98dda49e39e.png"
+  },
+  "frame": {
+    "compact": "64a57c0335563e85d81d5a76.png",
+    "full": "d1835b082acbceee19b83e98.png"
+  },
+  "frametrim": {
+    "compact": "755c5d6593103b719c2c1bbb.png",
+    "full": "e7c23caff167eac63f52c8bc.png"
+  },
+  "gusset": {
+    "compact": "a5b2080177e90b365b413fc1.png",
+    "full": "5ca374c5d70b9aab2b15dcd5.png"
+  },
+  "helix": {
+    "compact": "e31a4353a8167992ddb57ddd.png",
+    "full": "e0ac80b4ec8b47b5593627ac.png"
+  },
+  "hem": {
+    "compact": "f322f8556361e06fa6cd0183.png",
+    "full": "f1b6ed09e925e2f65e399bb4.png"
+  },
+  "hole": {
+    "compact": "ed4267f677c9ed6b64e378d7.png",
+    "full": "8ff37a96384ba219e4b1e3e0.png"
+  },
+  "idle": {
+    "compact": "d40d32f9b3918cc3f77335c5.png",
+    "full": "6e8a1fae4586ca0670889274.png"
+  },
+  "intersectioncurve": {
+    "compact": "e873569e75abfba9a5c9f035.png",
+    "full": "f9cc0666ee0920d8070cf2bf.png"
+  },
+  "isocline": {
+    "compact": "fc313b1cdfd43e2bf8faf0c4.png",
+    "full": "51fd550459996cdf57953a31.png"
+  },
+  "isoparametriccurve": {
+    "compact": "00e43e65e82884015e996176.png",
+    "full": "9bd51b1b9d2e3409a533be52.png"
+  },
+  "linearpattern": {
+    "compact": "9f8f879bcecb6bdcc801bf07.png",
+    "full": "751610d7eaa6c6bacda5b723.png"
+  },
+  "loft": {
+    "compact": "59322e4e52b279ed0d84812a.png",
+    "full": "ee38d3cedec3d35ceb8d27b5.png"
+  },
+  "makejoint": {
+    "compact": "5b32147402dc91b13addeaef.png",
+    "full": "2fe29ba1953a49e678c1aa9c.png"
+  },
+  "mateconnector": {
+    "compact": "eecc97713ee1d2ac8d91ea2a.png",
+    "full": "36b6daa4f49f3a3f6b98a8ef.png"
+  },
+  "mirror": {
+    "compact": "3138a39f66835d689cc4a70a.png",
+    "full": "5216e25c4b61fa33b24b1818.png"
+  },
+  "modifyfillet": {
+    "compact": "bb1f349322fb8ac32ed51027.png",
+    "full": "8ea14251ea99d25195afc07c.png"
+  },
+  "moveboundary": {
+    "compact": "d77c00ebeb26f73eaa1194d9.png",
+    "full": "878dde7f060cc685e53117a1.png"
+  },
+  "moveface": {
+    "compact": "2dc1581e45b43cdb6b0bacf9.png",
+    "full": "6bdb05f7df489f11b9371fa1.png"
+  },
+  "mutualtrim": {
+    "compact": "17b3894ed28e5ce5f4e4fe5d.png",
+    "full": "2586c3a1d5db2fb876f2d13f.png"
+  },
+  "offsetcurve": {
+    "compact": "1cc224c20fb952ced13ac64d.png",
+    "full": "129e1e1cf628cfca140ce42f.png"
+  },
+  "offsetsurface": {
+    "compact": "ba77299423b35d0ff09018aa.png",
+    "full": "91f9004700c5fb636d72df38.png"
+  },
+  "onshape": {
+    "compact": "d40d32f9b3918cc3f77335c5.png",
+    "full": "a6905c1672a27638ca021d32.png"
+  },
+  "partstudio": {
+    "compact": "702184e8591f667ef902e2bb.png",
+    "full": "41424007ec3603d848645a83.png"
+  },
+  "plane": {
+    "compact": "66dab5fb912db745ecc6110c.png",
+    "full": "6e08d39ef37359c27dc5e73d.png"
+  },
+  "projectedcurve": {
+    "compact": "0a1cfd1695683fc7788d1479.png",
+    "full": "e4ce4f083f5f43301279b002.png"
+  },
+  "queryvariable": {
+    "compact": "7d1a3f1ea4d50cd955f75673.png",
+    "full": "0f2cf3f76c2fc97a15d61817.png"
+  },
+  "replaceface": {
+    "compact": "5963928392454ff1d544c5de.png",
+    "full": "eee92cd619a6b4355f2890c3.png"
+  },
+  "revolve": {
+    "compact": "685d1659d4fd7f5479367285.png",
+    "full": "0447bff22c45f9c4c73684bf.png"
+  },
+  "rib": {
+    "compact": "da940146b43a511f686e4b5d.png",
+    "full": "ab2d7714fa3d772f2fdbc6a1.png"
+  },
+  "routingcurve": {
+    "compact": "91c8a014aa9e0915c8704da6.png",
+    "full": "d023f804412831fe2c4f36f6.png"
+  },
+  "ruledsurface": {
+    "compact": "a02773a2b65b1a33dd2a3109.png",
+    "full": "8ee299085d11d41088825ff8.png"
+  },
+  "sheetmetalloft": {
+    "compact": "791ac2da620efe07b54a2b0d.png",
+    "full": "c38fa7f30417a84087b55671.png"
+  },
+  "sheetmetalmodel": {
+    "compact": "8268d44a2aa43751a041e7b6.png",
+    "full": "9a2095acefbe0f50555c7d1a.png"
+  },
+  "shell": {
+    "compact": "6988fc7d6175f5c481fa965c.png",
+    "full": "6092869914d32f83731a9c47.png"
+  },
+  "sketch": {
+    "compact": "1ea844706ebe8957b7230aeb.png",
+    "full": "40414b29ffb9b9cedd43f394.png"
+  },
+  "split": {
+    "compact": "90ba323ac4a3a6dff01cb799.png",
+    "full": "600777618abb6d1c9a7bc505.png"
+  },
+  "sweep": {
+    "compact": "478e7bbaaf97bbd61b8da060.png",
+    "full": "8d4aaf01c2d369e019c0222f.png"
+  },
+  "tab": {
+    "compact": "68f54ff4d43beba56803def5.png",
+    "full": "319363d44a0eba11d9baa5a5.png"
+  },
+  "tag": {
+    "compact": "ee4aa6c03944ec0e724c99f2.png",
+    "full": "500a8ab0609c2214b42dd891.png"
+  },
+  "thicken": {
+    "compact": "34ca4849b42f59ff2b113d0d.png",
+    "full": "a76c146e1c881541668e1dd9.png"
+  },
+  "transform": {
+    "compact": "ec05ff2b8035858f708b3bb4.png",
+    "full": "3fc9fa79839148dbc0db22c0.png"
+  },
+  "trimcurve": {
+    "compact": "5f89e200dcd973f35cecfca2.png",
+    "full": "8b5ad251b8e1e1b5c8a63342.png"
+  },
+  "unavailable": {
+    "compact": "d40d32f9b3918cc3f77335c5.png",
+    "full": "a6905c1672a27638ca021d32.png"
+  },
+  "variable": {
+    "compact": "07a7062eced7027d9a5156c6.png",
+    "full": "efd5b399e88d7302ffc7b557.png"
+  },
+  "viewing": {
+    "compact": "702184e8591f667ef902e2bb.png",
+    "full": "41424007ec3603d848645a83.png"
+  },
+  "wrap": {
+    "compact": "14960829e6e81abe954d267d.png",
+    "full": "ed537d4a602a0b628c68b33e.png"
+  }
+}
