@@ -17,7 +17,7 @@ class FeatureTests(unittest.TestCase):
     def test_all_bundled_native_icons_render_and_idle_is_branded(self):
         for name in SOURCES:
             with self.subTest(name=name):
-                self.assertEqual(Image.open(BytesIO(feature_badge(name))).size, (300, 300))
+                self.assertEqual(Image.open(BytesIO(feature_badge(name))).size, (1024, 1024))
         self.assertNotEqual(feature_badge('Idle'), feature_badge('Extrude'))
 
     def test_renamed_features_use_editor_help_link(self):
@@ -43,10 +43,10 @@ class FeatureTests(unittest.TestCase):
         doc = {'id': 'doc', 'name': 'Biobuzz'}
         element = {'id': 'tab', 'elementType': 'PARTSTUDIO'}
         payload = make_presence(doc, element, 'Turret', 1, 'ws', {'label': 'Sketch', 'name': 'Sketch 67'})
-        self.assertEqual(payload['details'], 'Part Studio: Turret · Sketch 67')
+        self.assertEqual(payload['details'], 'Part Studio: Turret Â· Sketch 67')
         self.assertEqual(payload['state'], 'Document: Biobuzz')
         renamed = make_presence(doc, element, 'Turret', 1, activity={'label': 'Extrude', 'name': 'Motor Mount'})
-        self.assertEqual(renamed['details'], 'Part Studio: Turret · Extrude: Motor Mount')
+        self.assertEqual(renamed['details'], 'Part Studio: Turret Â· Extrude: Motor Mount')
         self.assertEqual(make_presence(doc, element, 'Turret', 1, activity={'label': 'Idle', 'name': ''})['state'],
                          'Document: Biobuzz')
         element['elementType'] = 'ASSEMBLY'
