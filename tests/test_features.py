@@ -43,10 +43,10 @@ class FeatureTests(unittest.TestCase):
         doc = {'id': 'doc', 'name': 'Biobuzz'}
         element = {'id': 'tab', 'elementType': 'PARTSTUDIO'}
         payload = make_presence(doc, element, 'Turret', 1, 'ws', {'label': 'Sketch', 'name': 'Sketch 67'})
-        self.assertEqual(payload['details'], 'Part Studio: Turret Â· Sketch 67')
+        self.assertEqual(payload['details'], 'Part Studio: Turret · Sketch 67')
         self.assertEqual(payload['state'], 'Document: Biobuzz')
         renamed = make_presence(doc, element, 'Turret', 1, activity={'label': 'Extrude', 'name': 'Motor Mount'})
-        self.assertEqual(renamed['details'], 'Part Studio: Turret Â· Extrude: Motor Mount')
+        self.assertEqual(renamed['details'], 'Part Studio: Turret · Extrude: Motor Mount')
         self.assertEqual(make_presence(doc, element, 'Turret', 1, activity={'label': 'Idle', 'name': ''})['state'],
                          'Document: Biobuzz')
         element['elementType'] = 'ASSEMBLY'
