@@ -160,21 +160,24 @@ class PresenceTests(unittest.TestCase):
             bridge.close()
 
     def test_url_lookup_is_cached_but_refreshes_for_changed_title(self):
-        main._tab_cache = None
-        try:
-            with patch('main.read_onshape_url', return_value='') as run, patch('main.time.monotonic', side_effect=[0, .5, .6, .9]):
-                main.cached_tab(1, 'Onshape - Robot | Intake', ('Robot', 'Intake'))
-                main.cached_tab(1, 'Onshape - Robot | Intake', ('Robot', 'Intake'))
-                self.assertEqual(run.call_count, 1)
-                main.cached_tab(1, 'Onshape - Robot | Shooter', ('Robot', 'Shooter'))
-                self.assertEqual(run.call_count, 2)
-                main.cached_tab(1, 'Onshape - Robot | Shooter', ('Robot', 'Shooter'))
-                self.assertEqual(run.call_count, 2)
-            with patch('main.read_onshape_url', return_value='') as run, patch('main.time.monotonic', return_value=2):
-                main.cached_tab(1, 'Onshape - Robot | Shooter', ('Robot', 'Shooter'))
-                self.assertEqual(run.call_count, 1)
-        finally:
-            main._tab_cache = None
+        from concurrent.futures import Future
+        executor = Mock()
+        def completed(*args):
+            future = Future()
+            future.set_result({'url': ''})
+            return future
+        executor.submit.side_effect = completed
+        with patch.object(main, '_url_executor', executor), patch.object(main, '_url_pending', None), patch.object(main, '_tab_cache', None), patch.object(main, '_browser_state', {}):
+            with patch('main.time.monotonic', side_effect=[0, .5, .6, .9, 2]):
+                main.cached_tab(1, 'Intake', ('Robot', 'Intake'))
+                main.cached_tab(1, 'Intake', ('Robot', 'Intake'))
+                self.assertEqual(executor.submit.call_count, 1)
+                main.cached_tab(1, 'Shooter', ('Robot', 'Shooter'))
+                self.assertEqual(executor.submit.call_count, 2)
+                main.cached_tab(1, 'Shooter', ('Robot', 'Shooter'))
+                self.assertEqual(executor.submit.call_count, 2)
+                main.cached_tab(1, 'Shooter', ('Robot', 'Shooter'))
+                self.assertEqual(executor.submit.call_count, 3)
 
     def test_background_render_does_not_block_or_serve_previous_tab(self):
         raw = BytesIO()

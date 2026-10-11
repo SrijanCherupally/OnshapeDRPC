@@ -1,5 +1,6 @@
 """Silent Onshape presence for the selected tab of the foremost Onshape window."""
 import ctypes
+from concurrent.futures import ThreadPoolExecutor
 from ctypes import wintypes
 import logging
 import json
@@ -30,6 +31,8 @@ _tab_cache = None
 _url_reader = None
 _browser_state = {}
 _onshape_hwnd = None
+_url_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="browser-state")
+_url_pending = None
 LABELS = {'PARTSTUDIO': 'Part Studio', 'ASSEMBLY': 'Assembly', 'DRAWING': 'Drawing',
           'VARIABLESTUDIO': 'Variable Studio', 'BILLOFMATERIALS': 'Bill of Materials', 'BLOB': 'Imported File'}
 log = logging.getLogger('onshape_presence')
@@ -50,21 +53,34 @@ def read_onshape_url(title):
 
 
 def cached_tab(hwnd, title, tab):
-    global _tab_cache
+    global _tab_cache, _url_pending, _browser_state
     now = time.monotonic()
     key = (hwnd, title)
-    if _tab_cache and _tab_cache[0] == key and now - _tab_cache[1] < URL_REFRESH_SECONDS:
-        return _tab_cache[2]
-    resolved = tab
-    try:
-        url = read_onshape_url(title)
-        match = re.fullmatch(r'https://cad\.onshape\.com/documents/([a-f0-9]{24})/([wvm])/([a-f0-9]{24})/e/([a-f0-9]{24})(?:[?#].*)?', url)
-        if match:
-            resolved = (*tab, match.groups())
-    except (OSError, subprocess.TimeoutExpired):
-        pass
-    _tab_cache = (key, now, resolved)
-    return resolved
+    if _url_pending and _url_pending[1].done():
+        pending_key, future = _url_pending
+        _url_pending = None
+        try:
+            state = future.result()
+        except Exception as error:
+            log.warning('Local browser read failed: %s', type(error).__name__)
+            state = {}
+        if pending_key == key:
+            _browser_state = state
+            resolved = tab
+            match = re.fullmatch(r'https://cad\.onshape\.com/documents/([a-f0-9]{24})/([wvm])/([a-f0-9]{24})/e/([a-f0-9]{24})(?:[?#].*)?', state.get('url', ''))
+            if match:
+                resolved = (*tab, match.groups())
+            _tab_cache = (key, now, resolved)
+    if not _tab_cache or _tab_cache[0] != key:
+        _browser_state = {}
+    if _url_pending is None and (not _tab_cache or _tab_cache[0] != key or now - _tab_cache[1] >= URL_REFRESH_SECONDS):
+        def read_state():
+            global _url_reader
+            if _url_reader is None:
+                _url_reader = UrlReader()
+            return _url_reader.read_state(title)
+        _url_pending = (key, _url_executor.submit(read_state))
+    return _tab_cache[2] if _tab_cache and _tab_cache[0] == key else tab
 
 
 def open_onshape_tab():
@@ -200,6 +216,60 @@ class Onshape:
         element = matches[0] if len(matches) == 1 else None
         return document, wid, element
 
+class BackgroundResolver:
+    """Never wait for HTTP metadata before submitting a local presence."""
+    def __init__(self, api):
+        self.api = api
+        self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix='metadata')
+        self.pending = None
+        self.results = {}
+        self.retry_at = {}
+
+    def resolve(self, tab):
+        now = time.monotonic()
+        if self.pending and self.pending[1].done():
+            key, future = self.pending
+            self.pending = None
+            try:
+                result = future.result()
+                if result:
+                    self.results[key] = result
+            except (requests.RequestException, BudgetExhausted) as error:
+                log.warning('Background metadata unavailable: %s', type(error).__name__)
+            except Exception as error:
+                log.warning('Background metadata failed: %s', type(error).__name__)
+            self.retry_at[key] = now + (86400 if key in self.results else 60)
+        if tab in self.results and now >= self.retry_at.get(tab, float('inf')):
+            self.results.pop(tab)
+        # Title-only discovery must not spend extra API calls before the URL arrives.
+        if len(tab) == 3 and tab not in self.results and self.pending is None and now >= self.retry_at.get(tab, 0):
+            self.pending = (tab, self.executor.submit(self.api.resolve, tab))
+        if tab in self.results:
+            document, context, element = self.results[tab]
+            return dict(document), context, dict(element) if element else None
+        document = {'id': tab[0], 'name': tab[0]}
+        element = {'id': tab[1], 'name': tab[1], 'elementType': 'UNKNOWN'}
+        context = None
+        if len(tab) == 3:
+            did, wvm, context, eid = tab[2]
+            document.update(id=did, _wvm=wvm)
+            element['id'] = eid
+            # Reuse disk or memory metadata immediately, without consuming credit.
+            key = ('elements', did, wvm, context)
+            cached = self.api.cache.get(key)
+            disk = getattr(self.api, 'disk_cache', {}).get(json.dumps(key))
+            elements = cached[1] if cached else disk[1] if disk else []
+            known = next((entry for entry in elements if entry.get('id') == eid), None)
+            if known:
+                element.update(known)
+                element['name'] = tab[1]
+        return document, context, element
+
+
+def presence_due(payload, last_payload, now, last_sent):
+    return payload != last_payload and (last_payload is None or now - last_sent >= PRESENCE_MIN_SECONDS)
+
+
 def make_presence(document, element, tab_name, start, context=None, activity=None):
     kind = LABELS.get(element.get('elementType'), 'Tab') if element else 'Tab'
     details = f'{kind}: {tab_name}'
@@ -231,6 +301,7 @@ def run():
     except OSError:
         return
     api = Onshape()
+    resolver = BackgroundResolver(api)
     bridge = SnapshotBridge()
     tracker = ActivityTracker()
     session_timer = SessionTimer()
@@ -256,12 +327,13 @@ def run():
                 last_payload = None
                 last_sent = 0
                 log.info('Connected to Discord.')
-            resolved = api.resolve(tab) if tab else None
+            resolved = resolver.resolve(tab) if tab else None
             if not resolved:
                 bridge.clear()
                 if last_payload is not None:
                     rpc.clear()
                     last_payload = None
+                    last_sent = 0
                 time.sleep(POLL_SECONDS)
                 continue
             document, wid, element = resolved
@@ -280,7 +352,7 @@ def run():
             if kind == 'ASSEMBLY':
                 payload['small_image'] = bridge.publish_symbol('Assembly')
                 payload['small_text'] = 'Assembly'
-            if payload != last_payload and time.monotonic() - last_sent >= PRESENCE_MIN_SECONDS:
+            if presence_due(payload, last_payload, time.monotonic(), last_sent):
                 reply = rpc.update(**payload)
                 accepted = reply.get('data') or {}
                 image_kind = ('feature' if use_badge else 'snapshot') if payload['large_image'].startswith('https://') else 'logo'
@@ -305,7 +377,7 @@ def run():
                 except Exception:
                     pass
             rpc = None
-        time.sleep(POLL_SECONDS if rpc is not None else 15)
+        time.sleep(POLL_SECONDS if rpc is not None else 2)
 
 
 if __name__ == '__main__':
