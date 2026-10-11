@@ -176,3 +176,5 @@ The local instance guard uses port 19287; the image server uses port 19288. snap
 Based on [IIRoan/OnshapeDRPC](https://github.com/IIRoan/OnshapeDRPC). This version adds selected-tab URL detection, blurred model previews, permission-enforced document links, silent startup helpers, reconnection, and diagnostics. Onshape and Discord are trademarks of their respective owners. This project is unofficial.
 
 The upstream repository does not include a license file. This repository preserves attribution and does not add a license granting rights to upstream code.
+
+Public image URLs are checked in the background before submission and rechecked every minute while displayed. Unreachable images use the permanent Onshape card, and a failed snapshot tunnel is restarted automatically with the existing retry limit. This adds small public image availability checks, not Onshape API requests.

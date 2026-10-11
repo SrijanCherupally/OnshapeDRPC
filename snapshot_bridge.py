@@ -179,6 +179,20 @@ class SnapshotBridge:
                     self.hostname = match.group(0)
         threading.Thread(target=read_output, daemon=True).start()
 
+    def image_failed(self, url):
+        # A live cloudflared process can still have an unreachable public hostname.
+        if self.hostname and url.startswith(self.hostname + '/'):
+            self.hostname = None
+            if self.process and self.process.poll() is None:
+                self.process.terminate()
+                try:
+                    self.process.wait(timeout=1)
+                except subprocess.TimeoutExpired:
+                    self.process.kill()
+            self.process = None
+            self.last_status = None
+            # ensure_tunnel keeps its existing 60-second retry limit.
+
     def clear(self):
         with self.lock:
             self.images.clear()

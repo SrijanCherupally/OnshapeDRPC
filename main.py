@@ -14,6 +14,7 @@ import time
 import requests
 from dotenv import load_dotenv
 from pypresence import Presence
+from image_delivery import ImageDelivery
 from snapshot_bridge import SnapshotBridge
 from api_budget import ApiBudget, BudgetExhausted
 from active_url import UrlReader
@@ -303,6 +304,7 @@ def run():
     api = Onshape()
     resolver = BackgroundResolver(api)
     bridge = SnapshotBridge()
+    delivery = ImageDelivery()
     tracker = ActivityTracker()
     session_timer = SessionTimer()
     rpc = None
@@ -352,6 +354,7 @@ def run():
             if kind == 'ASSEMBLY':
                 payload['small_image'] = bridge.publish_symbol('Assembly')
                 payload['small_text'] = 'Assembly'
+            payload = delivery.apply(payload, bridge)
             if presence_due(payload, last_payload, time.monotonic(), last_sent):
                 reply = rpc.update(**payload)
                 accepted = reply.get('data') or {}
